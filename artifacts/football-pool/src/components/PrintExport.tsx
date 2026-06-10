@@ -1,5 +1,5 @@
 import { usePoolState } from '@/hooks/usePoolState';
-import { Standing, Match, Team, getRoundLabel, getMatchLabel } from '@/lib/poolLogic';
+import { Standing, Match, Team, Pool, getRoundLabel, getMatchLabel, generatePoolSeeding } from '@/lib/poolLogic';
 
 function fmt(dateStr: string): string {
   if (!dateStr) return '—';
@@ -11,21 +11,20 @@ function fmt(dateStr: string): string {
   } catch { return dateStr; }
 }
 
-function PrintFixtures({ matches, teams }: { matches: Match[]; teams: Team[] }) {
+function PrintPoolFixtures({ pool, matches, teams }: { pool: Pool; matches: Match[]; teams: Team[] }) {
   const getTeamName = (id: string) => teams.find(t => t.id === id)?.name ?? id;
   return (
     <div className="print-section">
-      <h3 className="print-pool-title">League Fixtures</h3>
+      <h3 className="print-pool-title">{pool.name} — Fixtures</h3>
       <table className="print-table">
         <thead>
           <tr>
             <th style={{ width: '5%' }}>#</th>
-            <th style={{ width: '5%' }}>Leg</th>
-            <th style={{ width: '22%' }}>Date & Time</th>
-            <th style={{ width: '27%' }}>Home Team</th>
+            <th style={{ width: '22%' }}>Date</th>
+            <th style={{ width: '28%' }}>Home</th>
             <th style={{ width: '10%', textAlign: 'center' }}>Score</th>
-            <th style={{ width: '27%' }}>Away Team</th>
-            <th style={{ width: '4%', textAlign: 'center' }}>Res</th>
+            <th style={{ width: '28%' }}>Away</th>
+            <th style={{ width: '7%', textAlign: 'center' }}>Res</th>
           </tr>
         </thead>
         <tbody>
@@ -37,7 +36,6 @@ function PrintFixtures({ matches, teams }: { matches: Match[]; teams: Team[] }) 
             return (
               <tr key={m.id}>
                 <td>{m.matchNumber}</td>
-                <td style={{ textAlign: 'center', color: '#888' }}>{m.leg}</td>
                 <td>{fmt(m.date)}</td>
                 <td style={{ fontWeight: played && m.homeGoals! > m.awayGoals! ? 700 : 400 }}>{getTeamName(m.homeTeamId)}</td>
                 <td style={{ textAlign: 'center', fontWeight: 700, fontFamily: 'monospace' }}>
@@ -54,31 +52,31 @@ function PrintFixtures({ matches, teams }: { matches: Match[]; teams: Team[] }) 
   );
 }
 
-function PrintStandings({ standings }: { standings: Standing[] }) {
+function PrintPoolStandings({ pool, standings, qualifiersPerPool }: { pool: Pool; standings: Standing[]; qualifiersPerPool: number }) {
   return (
     <div className="print-section">
-      <h3 className="print-pool-title">League Standings</h3>
+      <h3 className="print-pool-title">{pool.name} — Standings</h3>
       <table className="print-table">
         <thead>
           <tr>
-            <th style={{ width: '6%', textAlign: 'center' }}>Pos</th>
-            <th style={{ width: '24%' }}>Team</th>
+            <th style={{ width: '5%', textAlign: 'center' }}>Pos</th>
+            <th style={{ width: '26%' }}>Team</th>
             <th style={{ width: '7%', textAlign: 'center' }}>P</th>
             <th style={{ width: '7%', textAlign: 'center' }}>W</th>
             <th style={{ width: '7%', textAlign: 'center' }}>D</th>
             <th style={{ width: '7%', textAlign: 'center' }}>L</th>
             <th style={{ width: '8%', textAlign: 'center' }}>GF</th>
             <th style={{ width: '8%', textAlign: 'center' }}>GA</th>
-            <th style={{ width: '9%', textAlign: 'center' }}>GD</th>
+            <th style={{ width: '8%', textAlign: 'center' }}>GD</th>
             <th style={{ width: '9%', textAlign: 'center' }}>Pts</th>
             <th style={{ width: '8%', textAlign: 'center' }}>Q</th>
           </tr>
         </thead>
         <tbody>
           {standings.map((s, idx) => {
-            const isTop2 = idx < 2;
+            const qualifies = idx < qualifiersPerPool;
             return (
-              <tr key={s.teamId} style={isTop2 ? { background: '#e8f5e9', fontWeight: 700 } : {}}>
+              <tr key={s.teamId} style={qualifies ? { background: '#e8f5e9', fontWeight: 700 } : {}}>
                 <td style={{ textAlign: 'center' }}>{idx + 1}</td>
                 <td>{s.teamName}</td>
                 <td style={{ textAlign: 'center' }}>{s.played}</td>
@@ -89,7 +87,7 @@ function PrintStandings({ standings }: { standings: Standing[] }) {
                 <td style={{ textAlign: 'center' }}>{s.ga}</td>
                 <td style={{ textAlign: 'center' }}>{s.gd > 0 ? `+${s.gd}` : s.gd}</td>
                 <td style={{ textAlign: 'center', fontWeight: 800, fontSize: '14px' }}>{s.points}</td>
-                <td style={{ textAlign: 'center', fontSize: '11px' }}>{isTop2 ? '🏆' : ''}</td>
+                <td style={{ textAlign: 'center', fontSize: '11px' }}>{qualifies ? '✓' : ''}</td>
               </tr>
             );
           })}
@@ -100,22 +98,22 @@ function PrintStandings({ standings }: { standings: Standing[] }) {
 }
 
 export default function PrintExport() {
-  const { teams, matches, standings, resolvedBracket, qualifiers } = usePoolState();
+  const { pools, teams, matches, poolStandings, resolvedBracket, qualifiers, settings } = usePoolState();
 
-  const totalRounds = Math.log2(qualifiers);
-  const champion = resolvedBracket.find(m => m.round === 1)?.winner ?? null;
-  const finalist1 = standings[0]?.teamName ?? '—';
-  const finalist2 = standings[1]?.teamName ?? '—';
+  const totalRounds   = Math.log2(qualifiers);
+  const champion      = resolvedBracket.find(m => m.round === 1)?.winner ?? null;
+  const qualifiersPerPool = Math.floor(qualifiers / settings.poolCount);
   const printDate = new Date().toLocaleDateString('en-GB', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
 
-  // Group bracket by round for printing
   const koRounds: { label: string; matches: typeof resolvedBracket }[] = [];
   for (let r = totalRounds; r >= 1; r--) {
     const rMatches = resolvedBracket.filter(m => m.round === r);
     if (rMatches.length) koRounds.push({ label: getRoundLabel(r, totalRounds), matches: rMatches });
   }
+
+  const seededStandings = generatePoolSeeding(poolStandings, qualifiers);
 
   return (
     <>
@@ -147,36 +145,79 @@ export default function PrintExport() {
         </div>
 
         <div className="print-body">
-          <h2 className="print-section-heading">League Fixtures</h2>
-          <PrintFixtures matches={matches} teams={teams} />
+          {/* Fixtures per pool */}
+          <h2 className="print-section-heading">Pool Fixtures</h2>
+          {pools.map(pool => (
+            <PrintPoolFixtures
+              key={pool.id}
+              pool={pool}
+              matches={matches.filter(m => m.poolId === pool.id)}
+              teams={teams}
+            />
+          ))}
 
           <div className="print-page-break" />
 
-          <h2 className="print-section-heading">League Standings</h2>
-          <PrintStandings standings={standings} />
+          {/* Standings per pool */}
+          <h2 className="print-section-heading">Pool Standings</h2>
+          {pools.map((pool, pi) => (
+            <PrintPoolStandings
+              key={pool.id}
+              pool={pool}
+              standings={poolStandings[pi] ?? []}
+              qualifiersPerPool={qualifiersPerPool}
+            />
+          ))}
 
+          {/* Knockout */}
           {koRounds.length > 0 && (
             <>
               <div className="print-page-break" />
               <h2 className="print-section-heading">Knockout Stage</h2>
+
+              {/* Seeding */}
+              <div className="print-section">
+                <h3 className="print-pool-title">Seeding</h3>
+                <table className="print-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '10%', textAlign: 'center' }}>Seed</th>
+                      <th style={{ width: '40%' }}>Team</th>
+                      <th style={{ width: '30%' }}>Pool</th>
+                      <th style={{ width: '20%', textAlign: 'center' }}>Points</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {seededStandings.map((s, i) => (
+                      <tr key={s.teamId}>
+                        <td style={{ textAlign: 'center', fontWeight: 700 }}>#{i + 1}</td>
+                        <td>{s.teamName}</td>
+                        <td>{pools.find(p => p.id === s.poolId)?.name ?? s.poolId}</td>
+                        <td style={{ textAlign: 'center' }}>{s.points}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
               {koRounds.map(({ label, matches: rMatches }) => (
                 <div key={label} className="print-section">
                   <h3 className="print-pool-title">{label}</h3>
                   <table className="print-table">
                     <thead>
                       <tr>
-                        <th style={{ width: '20%' }}>Match</th>
-                        <th style={{ width: '32%' }}>Home Team</th>
+                        <th style={{ width: '18%' }}>Match</th>
+                        <th style={{ width: '34%' }}>Home Team</th>
                         <th style={{ width: '12%', textAlign: 'center' }}>Score</th>
-                        <th style={{ width: '32%' }}>Away Team</th>
-                        <th style={{ width: '4%' }}></th>
+                        <th style={{ width: '34%' }}>Away Team</th>
+                        <th style={{ width: '2%' }}></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {rMatches.map((m, i) => {
+                      {rMatches.map(m => {
                         const played = m.homeGoals !== null && m.awayGoals !== null;
                         return (
-                          <tr key={m.id} style={m.winner ? { fontWeight: 600 } : {}}>
+                          <tr key={m.id}>
                             <td>{getMatchLabel(m.round, m.slot, totalRounds)}</td>
                             <td style={{ fontWeight: m.winner?.teamId === m.homeTeam?.teamId ? 800 : 400 }}>
                               {m.homeTeam?.teamName ?? 'TBD'}
@@ -207,18 +248,18 @@ export default function PrintExport() {
             </div>
           )}
 
-          {!champion && standings.length >= 2 && (
+          {!champion && seededStandings.length >= 2 && (
             <div className="print-finalists">
-              <div className="print-finalists-title">🏆 League Finalists</div>
+              <div className="print-finalists-title">🏆 Finalists</div>
               <div className="print-finalists-row">
                 <div className="print-finalist-box">
-                  <div className="print-finalist-label">1st Place</div>
-                  <div className="print-finalist-name">{finalist1}</div>
+                  <div className="print-finalist-label">{seededStandings[0]?.poolId ? pools.find(p=>p.id===seededStandings[0]?.poolId)?.name : ''} 1st</div>
+                  <div className="print-finalist-name">{seededStandings[0]?.teamName ?? '—'}</div>
                 </div>
                 <div className="print-finalist-vs">VS</div>
                 <div className="print-finalist-box">
-                  <div className="print-finalist-label">2nd Place</div>
-                  <div className="print-finalist-name">{finalist2}</div>
+                  <div className="print-finalist-label">{seededStandings[1]?.poolId ? pools.find(p=>p.id===seededStandings[1]?.poolId)?.name : ''} 1st</div>
+                  <div className="print-finalist-name">{seededStandings[1]?.teamName ?? '—'}</div>
                 </div>
               </div>
             </div>

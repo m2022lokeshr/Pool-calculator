@@ -1,5 +1,5 @@
 import { usePoolState } from '@/hooks/usePoolState';
-import { QualifierCount, ResolvedKOMatch, getRoundLabel, getMatchLabel } from '@/lib/poolLogic';
+import { QualifierCount, ResolvedKOMatch, getRoundLabel, getMatchLabel, generatePoolSeeding } from '@/lib/poolLogic';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -10,69 +10,52 @@ const QUALIFIER_OPTIONS: { value: QualifierCount; label: string }[] = [
   { value: 8, label: '8 teams (Quarter-Finals → Final)' },
 ];
 
-function TeamLabel({
-  team,
-  isWinner,
-  isHome,
-}: {
-  team: { teamName: string } | null;
-  isWinner: boolean;
-  isHome: boolean;
-}) {
-  if (!team) {
-    return (
-      <span className="text-white/30 italic text-sm">TBD</span>
-    );
-  }
-  return (
-    <span
-      className={`text-sm font-semibold transition-colors truncate max-w-[120px] ${
-        isWinner ? 'text-green-400' : 'text-white/85'
-      }`}
-    >
-      {isWinner && <span className="mr-1 text-green-400">✓</span>}
-      {team.teamName}
-    </span>
-  );
-}
+const POOL_COLORS = [
+  'rgba(34,197,94',
+  'rgba(59,130,246',
+  'rgba(168,85,247',
+  'rgba(249,115,22',
+];
 
 function KoMatchCard({
   match,
   label,
-  onUpdate,
   isFinal,
+  onUpdate,
 }: {
   match: ResolvedKOMatch;
   label: string;
-  onUpdate: (id: string, homeGoals: number | null, awayGoals: number | null) => void;
   isFinal: boolean;
+  onUpdate: (id: string, homeGoals: number | null, awayGoals: number | null) => void;
 }) {
-  const hasTeams = match.homeTeam && match.awayTeam;
+  const hasTeams = !!(match.homeTeam && match.awayTeam);
   const homeWon = match.winner?.teamId === match.homeTeam?.teamId;
   const awayWon = match.winner?.teamId === match.awayTeam?.teamId;
 
   return (
     <div
-      className={`glass-match-row rounded-xl p-4 transition-all ${
-        isFinal ? 'ring-1 ring-primary/40' : ''
-      }`}
+      className={`glass-match-row rounded-xl p-4 transition-all ${isFinal ? 'ring-1 ring-primary/40' : ''}`}
       data-testid={`ko-match-${match.id}`}
     >
       <div className="text-[10px] font-bold uppercase tracking-widest text-white/35 mb-3">{label}</div>
 
-      {/* Home row */}
-      <div className={`flex items-center gap-3 mb-2 p-2 rounded-lg transition-colors ${homeWon ? 'bg-green-500/10' : 'bg-white/[0.03]'}`}>
+      {/* Home */}
+      <div className={`flex items-center gap-3 mb-2 p-2 rounded-lg ${homeWon ? 'bg-green-500/10' : 'bg-white/[0.03]'}`}>
         <div className="flex-1 min-w-0">
-          <TeamLabel team={match.homeTeam} isWinner={homeWon} isHome />
+          {match.homeTeam ? (
+            <span className={`text-sm font-semibold truncate max-w-[120px] block ${homeWon ? 'text-green-400' : 'text-white/85'}`}>
+              {homeWon && <span className="mr-1">✓</span>}
+              {match.homeTeam.teamName}
+            </span>
+          ) : (
+            <span className="text-white/30 italic text-sm">TBD</span>
+          )}
         </div>
         <Input
           type="number"
           min="0"
           value={match.homeGoals === null ? '' : match.homeGoals}
-          onChange={e => {
-            const v = e.target.value;
-            onUpdate(match.id, v === '' ? null : Number(v), match.awayGoals);
-          }}
+          onChange={e => onUpdate(match.id, e.target.value === '' ? null : Number(e.target.value), match.awayGoals)}
           placeholder="—"
           disabled={!hasTeams}
           className="w-14 h-8 text-center font-bold text-base disabled:opacity-30"
@@ -83,19 +66,23 @@ function KoMatchCard({
 
       <div className="text-center text-white/20 text-xs font-bold my-1 tracking-wider">vs</div>
 
-      {/* Away row */}
-      <div className={`flex items-center gap-3 mt-2 p-2 rounded-lg transition-colors ${awayWon ? 'bg-green-500/10' : 'bg-white/[0.03]'}`}>
+      {/* Away */}
+      <div className={`flex items-center gap-3 mt-2 p-2 rounded-lg ${awayWon ? 'bg-green-500/10' : 'bg-white/[0.03]'}`}>
         <div className="flex-1 min-w-0">
-          <TeamLabel team={match.awayTeam} isWinner={awayWon} isHome={false} />
+          {match.awayTeam ? (
+            <span className={`text-sm font-semibold truncate max-w-[120px] block ${awayWon ? 'text-green-400' : 'text-white/85'}`}>
+              {awayWon && <span className="mr-1">✓</span>}
+              {match.awayTeam.teamName}
+            </span>
+          ) : (
+            <span className="text-white/30 italic text-sm">TBD</span>
+          )}
         </div>
         <Input
           type="number"
           min="0"
           value={match.awayGoals === null ? '' : match.awayGoals}
-          onChange={e => {
-            const v = e.target.value;
-            onUpdate(match.id, match.homeGoals, v === '' ? null : Number(v));
-          }}
+          onChange={e => onUpdate(match.id, match.homeGoals, e.target.value === '' ? null : Number(e.target.value))}
           placeholder="—"
           disabled={!hasTeams}
           className="w-14 h-8 text-center font-bold text-base disabled:opacity-30"
@@ -108,17 +95,19 @@ function KoMatchCard({
 }
 
 export default function KnockoutPage() {
-  const { qualifiers, resolvedBracket, standings, updateKoMatch, updateQualifiers } = usePoolState();
+  const { qualifiers, resolvedBracket, pools, poolStandings, updateKoMatch, updateQualifiers, settings } = usePoolState();
 
   const totalRounds = Math.log2(qualifiers);
+  const qualifiersPerPool = qualifiers / settings.poolCount;
+  const unevenSplit = !Number.isInteger(qualifiersPerPool);
+  const enoughTeams = poolStandings.every(ps => ps.length >= Math.ceil(qualifiers / settings.poolCount));
 
-  // Group by round descending (QF first, then SF, then Final)
+  const seededStandings = generatePoolSeeding(poolStandings, qualifiers);
+
   const rounds: { round: number; label: string; matches: ResolvedKOMatch[] }[] = [];
   for (let r = totalRounds; r >= 1; r--) {
     const rMatches = resolvedBracket.filter(m => m.round === r);
-    if (rMatches.length > 0) {
-      rounds.push({ round: r, label: getRoundLabel(r, totalRounds), matches: rMatches });
-    }
+    if (rMatches.length) rounds.push({ round: r, label: getRoundLabel(r, totalRounds), matches: rMatches });
   }
 
   const finalMatch = resolvedBracket.find(m => m.round === 1);
@@ -128,14 +117,11 @@ export default function KnockoutPage() {
     updateKoMatch(id, { homeGoals, awayGoals });
   }
 
-  const enoughTeams = standings.length >= qualifiers;
-
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 animate-in fade-in duration-300">
-      {/* Header */}
       <div className="mb-8">
         <h1 className="font-display text-4xl font-bold text-white mb-2 drop-shadow-lg">Knockout Stage</h1>
-        <p className="text-white/55">Single-elimination bracket auto-seeded from league standings.</p>
+        <p className="text-white/55">Single-elimination bracket auto-seeded from pool standings.</p>
       </div>
 
       {/* Settings bar */}
@@ -158,9 +144,9 @@ export default function KnockoutPage() {
             ))}
           </SelectContent>
         </Select>
-        {!enoughTeams && (
+        {unevenSplit && (
           <span className="text-yellow-400 text-xs">
-            ⚠ League needs at least {qualifiers} teams (currently {standings.length})
+            ⚠ {qualifiers} spots ÷ {settings.poolCount} pools doesn't divide evenly — seeding by rank order across pools
           </span>
         )}
       </div>
@@ -187,14 +173,11 @@ export default function KnockoutPage() {
       <div className="space-y-8">
         {rounds.map(({ round, label, matches }) => (
           <div key={round}>
-            {/* Round header */}
             <div className="flex items-center gap-3 mb-4">
               <div className="h-px flex-1 bg-white/10" />
               <span className="text-white/50 text-xs font-bold uppercase tracking-widest px-3">{label}</span>
               <div className="h-px flex-1 bg-white/10" />
             </div>
-
-            {/* Matches grid */}
             <div
               className={`grid gap-4 ${
                 matches.length === 1
@@ -209,8 +192,8 @@ export default function KnockoutPage() {
                   key={m.id}
                   match={m}
                   label={getMatchLabel(m.round, m.slot, totalRounds)}
-                  onUpdate={handleUpdate}
                   isFinal={m.round === 1}
+                  onUpdate={handleUpdate}
                 />
               ))}
             </div>
@@ -218,12 +201,49 @@ export default function KnockoutPage() {
         ))}
       </div>
 
-      {/* Seeding info */}
-      {enoughTeams && (
-        <div className="mt-8 glass-card rounded-xl p-4">
-          <div className="text-white/40 text-xs font-bold uppercase tracking-wider mb-3">Seeding (from League Standings)</div>
+      {/* Seeding by pool */}
+      <div className="mt-8 glass-card rounded-xl p-5">
+        <div className="text-white/40 text-xs font-bold uppercase tracking-wider mb-4">
+          Seeding from Pool Standings
+        </div>
+        {pools.length > 1 ? (
+          <div className="space-y-3">
+            {pools.map((pool, pi) => {
+              const c = POOL_COLORS[pi] ?? POOL_COLORS[0];
+              const poolQ = Math.ceil(qualifiers / settings.poolCount);
+              const poolQualifiers = (poolStandings[pi] ?? []).slice(0, poolQ);
+              return (
+                <div key={pool.id} className="flex items-center gap-3 flex-wrap">
+                  <span
+                    className="text-xs font-bold px-2 py-1 rounded-full shrink-0"
+                    style={{ background: `${c},0.18)`, color: `${c},1)`, border: `1px solid ${c},0.3)` }}
+                  >
+                    {pool.name}
+                  </span>
+                  <div className="flex gap-2 flex-wrap">
+                    {poolQualifiers.length > 0 ? poolQualifiers.map((s, rank) => (
+                      <div
+                        key={s.teamId}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
+                        style={{ background: `${c},0.08)`, border: `1px solid ${c},0.18)` }}
+                      >
+                        <span className="text-white/35">#{rank + 1}</span>
+                        <span className="text-white/80">{s.teamName}</span>
+                        <Badge variant="outline" className="text-[9px] py-0 h-4 border-white/20 text-white/50">
+                          {s.points}pts
+                        </Badge>
+                      </div>
+                    )) : (
+                      <span className="text-white/25 text-xs italic">No results yet</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
           <div className="flex flex-wrap gap-2">
-            {standings.slice(0, qualifiers).map((s, i) => (
+            {seededStandings.map((s, i) => (
               <div
                 key={s.teamId}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold"
@@ -231,17 +251,14 @@ export default function KnockoutPage() {
               >
                 <span className="text-white/40">#{i + 1}</span>
                 <span className="text-white/80">{s.teamName}</span>
-                <Badge
-                  variant="outline"
-                  className="text-[9px] py-0 h-4 border-primary/40 text-primary"
-                >
+                <Badge variant="outline" className="text-[9px] py-0 h-4 border-primary/40 text-primary">
                   {s.points}pts
                 </Badge>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
