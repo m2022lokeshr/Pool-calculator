@@ -8,6 +8,10 @@ import {
 const DEFAULT_SETTINGS: LeagueSettings = { poolCount: 2, teamsPerPool: 4, legs: 1 };
 const DEFAULT_QUALIFIERS: QualifierCount = 4;
 
+function defaultPoolNames(count: number): string[] {
+  return Array.from({ length: count }, (_, i) => `Pool ${String.fromCharCode(65 + i)}`);
+}
+
 function mergeMatches(newMatches: Match[], prevMatches: Match[]): Match[] {
   return newMatches.map(nm => {
     const ex = prevMatches.find(pm => pm.id === nm.id);
@@ -46,6 +50,10 @@ export function usePoolState() {
     load('fp3_ko', generateKnockoutStructure(DEFAULT_QUALIFIERS))
   );
 
+  const [poolNames, setPoolNames] = useState<string[]>(() =>
+    load('fp3_poolNames', defaultPoolNames(DEFAULT_SETTINGS.poolCount))
+  );
+
   // Refs to avoid stale closures in callbacks
   const settingsRef = useRef(settings);
   const teamsRef    = useRef(teams);
@@ -60,9 +68,13 @@ export function usePoolState() {
   useEffect(() => { localStorage.setItem('fp3_matches',    JSON.stringify(matches));   }, [matches]);
   useEffect(() => { localStorage.setItem('fp3_qualifiers', JSON.stringify(qualifiers));}, [qualifiers]);
   useEffect(() => { localStorage.setItem('fp3_ko',         JSON.stringify(koMatches)); }, [koMatches]);
+  useEffect(() => { localStorage.setItem('fp3_poolNames',  JSON.stringify(poolNames)); }, [poolNames]);
 
   // Derived
-  const pools: Pool[] = useMemo(() => getPools(settings.poolCount), [settings.poolCount]);
+  const pools: Pool[] = useMemo(
+    () => getPools(settings.poolCount, poolNames),
+    [settings.poolCount, poolNames]
+  );
 
   const poolStandings: Standing[][] = useMemo(() =>
     pools.map(pool => {
@@ -115,6 +127,14 @@ export function usePoolState() {
     setTeams(newTeams);
     setSettings(prev => ({ ...prev, poolCount: newCount }));
     setMatches(mergeMatches(newMatches, prevMatches));
+    // Preserve existing names, pad with defaults for new pools
+    setPoolNames(prev => {
+      const extended = [...prev];
+      while (extended.length < newCount) {
+        extended.push(`Pool ${String.fromCharCode(65 + extended.length)}`);
+      }
+      return extended.slice(0, newCount);
+    });
   }, []);
 
   const updateTeamsPerPool = useCallback((newTPP: number) => {
@@ -161,6 +181,14 @@ export function usePoolState() {
     setKoMatches(generateKnockoutStructure(q));
   }, []);
 
+  const updatePoolName = useCallback((poolIndex: number, name: string) => {
+    setPoolNames(prev => {
+      const next = [...prev];
+      next[poolIndex] = name;
+      return next;
+    });
+  }, []);
+
   return {
     settings,
     teams,
@@ -176,5 +204,6 @@ export function usePoolState() {
     updateLegs,
     updateKoMatch,
     updateQualifiers,
+    updatePoolName,
   };
 }

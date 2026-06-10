@@ -64,10 +64,10 @@ export interface ResolvedKOMatch {
 
 // ─── Pool helpers ────────────────────────────────────────────────────────────
 
-export function getPools(poolCount: number): Pool[] {
+export function getPools(poolCount: number, customNames?: string[]): Pool[] {
   return Array.from({ length: poolCount }, (_, i) => ({
     id: `pool-${i}`,
-    name: `Pool ${String.fromCharCode(65 + i)}`,
+    name: customNames?.[i]?.trim() || `Pool ${String.fromCharCode(65 + i)}`,
   }));
 }
 

@@ -10,7 +10,7 @@ export default function FixturesPage() {
   const {
     settings, pools, teams, matches,
     updateTeamName, updateMatch,
-    updatePoolCount, updateTeamsPerPool, updateLegs,
+    updatePoolCount, updateTeamsPerPool, updateLegs, updatePoolName,
   } = usePoolState();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -237,11 +237,18 @@ export default function FixturesPage() {
             <div key={pool.id}>
               {/* Pool header */}
               <div
-                className="rounded-t-xl px-5 py-3 flex items-center justify-between"
+                className="rounded-t-xl px-5 py-3 flex items-center justify-between gap-3"
                 style={{ background: `${base},0.18)`, borderBottom: `1px solid ${base},0.3)` }}
               >
-                <h2 className="font-display text-2xl font-bold text-white tracking-wide">{pool.name}</h2>
-                <span className="text-white/40 text-xs font-mono">{poolPlayed}/{poolMatches.length} played</span>
+                <input
+                  value={pool.name}
+                  onChange={e => updatePoolName(pi, e.target.value)}
+                  className="font-display text-2xl font-bold text-white tracking-wide bg-transparent border-none outline-none focus:underline decoration-dashed decoration-white/30 underline-offset-4 min-w-0 flex-1"
+                  style={{ caretColor: `${base},1)` }}
+                  aria-label={`Rename ${pool.name}`}
+                  data-testid={`input-pool-name-${pool.id}`}
+                />
+                <span className="text-white/40 text-xs font-mono shrink-0">{poolPlayed}/{poolMatches.length} played</span>
               </div>
 
               {/* Team names */}
