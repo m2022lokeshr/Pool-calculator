@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import FixturesPage from "@/pages/FixturesPage";
 import StandingsPage from "@/pages/StandingsPage";
+import PrintExport from "@/components/PrintExport";
 
 const queryClient = new QueryClient();
 
@@ -74,6 +75,7 @@ function App() {
               <Router />
             </main>
           </div>
+          <PrintExport />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

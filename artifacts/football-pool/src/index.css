@@ -318,6 +318,223 @@
   white-space: nowrap;
 }
 
+/* ====== PRINT / PDF EXPORT ====== */
+.print-only {
+  display: none;
+}
+
+.no-print {}
+
+@media print {
+  /* Hide everything on-screen */
+  .no-print,
+  header,
+  nav,
+  button,
+  .pitch-bg-image,
+  .pitch-bg-overlay {
+    display: none !important;
+  }
+
+  /* Show print-only content */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Reset body for clean paper look */
+  body, html {
+    background: #fff !important;
+    color: #111 !important;
+    font-family: 'Inter', Arial, sans-serif !important;
+    font-size: 11px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Force white bg on all glass/dark elements */
+  * {
+    background: transparent !important;
+    color: #111 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Print document container */
+  .print-document {
+    width: 100%;
+    max-width: 100%;
+    padding: 12mm 14mm;
+    box-sizing: border-box;
+  }
+
+  .print-header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    border-bottom: 3px solid #1a7a3c;
+    padding-bottom: 8px;
+    margin-bottom: 18px;
+  }
+
+  .print-header-logo {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #1a7a3c !important;
+  }
+
+  .print-header-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #333 !important;
+    flex: 1;
+  }
+
+  .print-header-date {
+    font-size: 10px;
+    color: #777 !important;
+    white-space: nowrap;
+  }
+
+  .print-section-heading {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #1a7a3c !important;
+    margin: 18px 0 8px 0;
+    border-bottom: 1px solid #cde8d8;
+    padding-bottom: 4px;
+  }
+
+  .print-pool-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #333 !important;
+    margin: 12px 0 5px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10.5px;
+    margin-bottom: 6px;
+  }
+
+  .print-table thead tr {
+    background: #e8f5e9 !important;
+  }
+
+  .print-table th {
+    padding: 5px 7px;
+    text-align: left;
+    font-weight: 700;
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #2d6a4f !important;
+    border-bottom: 1.5px solid #a8d5b5;
+    border-top: 1px solid #a8d5b5;
+  }
+
+  .print-table td {
+    padding: 5px 7px;
+    border-bottom: 1px solid #e0e0e0;
+    color: #111 !important;
+    vertical-align: middle;
+  }
+
+  .print-table tbody tr:nth-child(even) {
+    background: #fafafa !important;
+  }
+
+  .print-section {
+    margin-bottom: 10px;
+  }
+
+  .print-page-break {
+    page-break-before: always;
+    break-before: page;
+    height: 0;
+  }
+
+  .print-finalists {
+    margin-top: 24px;
+    border: 2px solid #1a7a3c;
+    border-radius: 8px;
+    padding: 16px 20px;
+    background: #f0faf4 !important;
+    page-break-inside: avoid;
+  }
+
+  .print-finalists-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: #1a7a3c !important;
+    text-align: center;
+    margin-bottom: 14px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .print-finalists-row {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    justify-content: center;
+  }
+
+  .print-finalist-box {
+    flex: 1;
+    text-align: center;
+    border: 1.5px solid #1a7a3c;
+    border-radius: 6px;
+    padding: 12px 16px;
+    background: #fff !important;
+    max-width: 220px;
+  }
+
+  .print-finalist-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #666 !important;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+
+  .print-finalist-name {
+    font-size: 16px;
+    font-weight: 800;
+    color: #1a7a3c !important;
+  }
+
+  .print-finalist-vs {
+    font-size: 18px;
+    font-weight: 900;
+    color: #ccc !important;
+    flex-shrink: 0;
+  }
+
+  .print-footer {
+    margin-top: 24px;
+    text-align: center;
+    font-size: 9px;
+    color: #aaa !important;
+    border-top: 1px solid #e0e0e0;
+    padding-top: 8px;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm;
+  }
+}
+
 /**
  * Using the elevate system.
  * Automatic contrast adjustment.
