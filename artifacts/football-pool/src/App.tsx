@@ -12,21 +12,35 @@ function Navigation() {
   const [location] = useLocation();
 
   return (
-    <header className="bg-sidebar border-b border-sidebar-border sticky top-0 z-50">
+    <header className="glass-nav football-pattern sticky top-0 z-50">
       <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground shadow-inner">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-full bg-primary/90 flex items-center justify-center shadow-lg shadow-primary/30 text-lg border border-primary/60">
             ⚽
           </div>
-          <span className="font-display text-xl font-bold text-sidebar-foreground tracking-wide">
-            POOL<span className="text-primary-foreground/70">CALC</span>
+          <span className="font-display text-xl font-bold text-white tracking-widest">
+            POOL<span className="text-primary">CALC</span>
           </span>
         </div>
-        <nav className="flex gap-2 h-full">
-          <Link href="/" className={`flex items-center h-full px-4 text-sm font-medium transition-colors border-b-2 ${location === '/' ? 'border-primary text-primary-foreground' : 'border-transparent text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50'}`}>
-            Fixtures
+        <nav className="flex gap-1 h-full">
+          <Link
+            href="/"
+            className={`flex items-center gap-1.5 h-full px-5 text-sm font-semibold tracking-wide transition-all border-b-2 ${
+              location === '/'
+                ? 'border-primary text-white bg-white/5'
+                : 'border-transparent text-white/55 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            ⚽ Fixtures
           </Link>
-          <Link href="/standings" className={`flex items-center h-full px-4 text-sm font-medium transition-colors border-b-2 ${location === '/standings' ? 'border-primary text-primary-foreground' : 'border-transparent text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50'}`}>
+          <Link
+            href="/standings"
+            className={`flex items-center gap-1.5 h-full px-5 text-sm font-semibold tracking-wide transition-all border-b-2 ${
+              location === '/standings'
+                ? 'border-primary text-white bg-white/5'
+                : 'border-transparent text-white/55 hover:text-white hover:bg-white/5'
+            }`}
+          >
             📊 Points Table
           </Link>
         </nav>
@@ -50,7 +64,11 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <div className="min-h-[100dvh] flex flex-col bg-background selection:bg-primary/20">
+          {/* Fixed stadium background layers */}
+          <div className="pitch-bg-image" aria-hidden="true" />
+          <div className="pitch-bg-overlay" aria-hidden="true" />
+
+          <div className="min-h-[100dvh] flex flex-col selection:bg-primary/30">
             <Navigation />
             <main className="flex-1">
               <Router />

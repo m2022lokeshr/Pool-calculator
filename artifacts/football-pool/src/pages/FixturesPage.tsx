@@ -14,20 +14,21 @@ export default function FixturesPage() {
   const matchesB = matches.filter(m => m.pool === 'B');
 
   const renderTeamInputs = (poolTeams: Team[], pool: string) => (
-    <Card className="mb-6">
-      <CardHeader className="bg-muted border-b py-3 px-4">
+    <Card className="glass-card mb-6 rounded-xl overflow-hidden">
+      <CardHeader className="border-b border-white/10 py-3 px-4" style={{background: 'rgba(34,197,94,0.08)'}}>
         <CardTitle className="font-display text-xl text-primary">Pool {pool} Teams</CardTitle>
       </CardHeader>
       <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         {poolTeams.map((team, idx) => (
           <div key={team.id} className="space-y-1">
-            <Label htmlFor={`team-${team.id}`} className="text-xs text-muted-foreground uppercase tracking-wider">Team {idx + 1}</Label>
+            <Label htmlFor={`team-${team.id}`} className="text-xs text-white/50 uppercase tracking-wider">Team {idx + 1}</Label>
             <Input 
               id={`team-${team.id}`}
               value={team.name} 
               onChange={e => updateTeamName(team.id, e.target.value)} 
               data-testid={`input-team-${team.id}`}
-              className="font-medium bg-background"
+              className="font-medium text-white placeholder:text-white/30"
+              style={{background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)'}}
             />
           </div>
         ))}
@@ -36,7 +37,7 @@ export default function FixturesPage() {
   );
 
   const renderMatchRow = (match: Match, poolTeams: Team[]) => (
-    <div key={match.id} className="flex flex-wrap md:flex-nowrap items-center gap-2 p-3 border rounded-md bg-card mb-2 shadow-sm transition-all hover:border-primary/50">
+    <div key={match.id} className="glass-match-row flex flex-wrap md:flex-nowrap items-center gap-2 p-3 rounded-lg mb-2">
       <div className="w-16">
         <Input 
           value={match.matchNumber} 
@@ -122,15 +123,15 @@ export default function FixturesPage() {
   return (
     <div className="max-w-5xl mx-auto py-8 px-4 animate-in fade-in duration-300">
       <div className="mb-8">
-        <h1 className="font-display text-4xl font-bold text-foreground mb-2">Tournament Fixtures</h1>
-        <p className="text-muted-foreground">Manage participating teams and enter match results. Standings are calculated automatically.</p>
+        <h1 className="font-display text-4xl font-bold text-white mb-2 drop-shadow-lg">Tournament Fixtures</h1>
+        <p className="text-white/55">Manage participating teams and enter match results. Standings are calculated automatically.</p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         <div>
           {renderTeamInputs(teamsA, 'A')}
-          <div className="bg-background rounded-lg border p-4 shadow-sm">
-            <h3 className="font-display text-lg font-semibold mb-4 text-primary">Pool A Matches</h3>
+          <div className="glass-card rounded-xl p-4">
+            <h3 className="font-display text-lg font-semibold mb-4 text-primary tracking-wide">Pool A Matches</h3>
             <div className="space-y-2">
               {matchesA.map(m => renderMatchRow(m, teamsA))}
             </div>
@@ -139,8 +140,8 @@ export default function FixturesPage() {
 
         <div>
           {renderTeamInputs(teamsB, 'B')}
-          <div className="bg-background rounded-lg border p-4 shadow-sm">
-            <h3 className="font-display text-lg font-semibold mb-4 text-primary">Pool B Matches</h3>
+          <div className="glass-card rounded-xl p-4">
+            <h3 className="font-display text-lg font-semibold mb-4 text-primary tracking-wide">Pool B Matches</h3>
             <div className="space-y-2">
               {matchesB.map(m => renderMatchRow(m, teamsB))}
             </div>
