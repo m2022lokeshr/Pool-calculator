@@ -1,61 +1,86 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Team, Match, calculateStandings } from '@/lib/poolLogic';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import {
+  Team, Match, Standing, LeagueSettings, QualifierCount, KnockoutMatch,
+  generateRoundRobinMatches, calculateStandings,
+  generateKnockoutStructure, resolveKnockout, ResolvedKOMatch,
+} from '@/lib/poolLogic';
 
-const DEFAULT_TEAMS_A: Team[] = [
-  { id: 'A1', pool: 'A', name: 'Team A1' },
-  { id: 'A2', pool: 'A', name: 'Team A2' },
-  { id: 'A3', pool: 'A', name: 'Team A3' },
-  { id: 'A4', pool: 'A', name: 'Team A4' },
-];
+const DEFAULT_SETTINGS: LeagueSettings = { teamCount: 8, legs: 1 };
+const DEFAULT_QUALIFIERS: QualifierCount = 2;
 
-const DEFAULT_TEAMS_B: Team[] = [
-  { id: 'B1', pool: 'B', name: 'Team B1' },
-  { id: 'B2', pool: 'B', name: 'Team B2' },
-  { id: 'B3', pool: 'B', name: 'Team B3' },
-  { id: 'B4', pool: 'B', name: 'Team B4' },
-];
-
-const generateMatches = (poolTeams: Team[], pool: 'A' | 'B'): Match[] => {
-  const pairs = [
-    [0, 1], [0, 2], [0, 3],
-    [1, 2], [1, 3], [2, 3]
-  ];
-  return pairs.map((pair, idx) => ({
-    id: `${pool}-match-${idx + 1}`,
-    pool,
-    matchNumber: `${pool}${idx + 1}`,
-    date: '',
-    homeTeamId: poolTeams[pair[0]].id,
-    awayTeamId: poolTeams[pair[1]].id,
-    homeGoals: null,
-    awayGoals: null,
+function makeTeams(count: number): Team[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `team-${i + 1}`,
+    name: `Team ${i + 1}`,
   }));
-};
+}
 
-const DEFAULT_TEAMS = [...DEFAULT_TEAMS_A, ...DEFAULT_TEAMS_B];
-const DEFAULT_MATCHES = [
-  ...generateMatches(DEFAULT_TEAMS_A, 'A'),
-  ...generateMatches(DEFAULT_TEAMS_B, 'B'),
-];
+function mergeMatches(newMatches: Match[], prevMatches: Match[]): Match[] {
+  return newMatches.map(nm => {
+    const ex = prevMatches.find(pm => pm.id === nm.id);
+    if (ex) return { ...nm, homeGoals: ex.homeGoals, awayGoals: ex.awayGoals, date: ex.date, matchNumber: ex.matchNumber };
+    return nm;
+  });
+}
 
 export function usePoolState() {
+  const [settings, setSettings] = useState<LeagueSettings>(() => {
+    try { const s = localStorage.getItem('fp2_settings'); return s ? JSON.parse(s) : DEFAULT_SETTINGS; }
+    catch { return DEFAULT_SETTINGS; }
+  });
+
   const [teams, setTeams] = useState<Team[]>(() => {
-    const stored = localStorage.getItem('footballPool_teams');
-    return stored ? JSON.parse(stored) : DEFAULT_TEAMS;
+    try {
+      const s = localStorage.getItem('fp2_teams');
+      return s ? JSON.parse(s) : makeTeams(DEFAULT_SETTINGS.teamCount);
+    } catch { return makeTeams(DEFAULT_SETTINGS.teamCount); }
   });
 
   const [matches, setMatches] = useState<Match[]>(() => {
-    const stored = localStorage.getItem('footballPool_matches');
-    return stored ? JSON.parse(stored) : DEFAULT_MATCHES;
+    try {
+      const s = localStorage.getItem('fp2_matches');
+      if (s) return JSON.parse(s);
+      const t = makeTeams(DEFAULT_SETTINGS.teamCount);
+      return generateRoundRobinMatches(t, DEFAULT_SETTINGS.legs);
+    } catch {
+      const t = makeTeams(DEFAULT_SETTINGS.teamCount);
+      return generateRoundRobinMatches(t, DEFAULT_SETTINGS.legs);
+    }
   });
 
-  useEffect(() => {
-    localStorage.setItem('footballPool_teams', JSON.stringify(teams));
-  }, [teams]);
+  const [qualifiers, setQualifiers] = useState<QualifierCount>(() => {
+    try { const s = localStorage.getItem('fp2_qualifiers'); return s ? JSON.parse(s) : DEFAULT_QUALIFIERS; }
+    catch { return DEFAULT_QUALIFIERS; }
+  });
 
-  useEffect(() => {
-    localStorage.setItem('footballPool_matches', JSON.stringify(matches));
-  }, [matches]);
+  const [koMatches, setKoMatches] = useState<KnockoutMatch[]>(() => {
+    try {
+      const s = localStorage.getItem('fp2_ko');
+      return s ? JSON.parse(s) : generateKnockoutStructure(DEFAULT_QUALIFIERS);
+    } catch { return generateKnockoutStructure(DEFAULT_QUALIFIERS); }
+  });
+
+  // Refs for use inside callbacks without stale closures
+  const teamsRef = useRef(teams);
+  const settingsRef = useRef(settings);
+  const matchesRef = useRef(matches);
+  useEffect(() => { teamsRef.current = teams; }, [teams]);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
+  useEffect(() => { matchesRef.current = matches; }, [matches]);
+
+  // Persist
+  useEffect(() => { localStorage.setItem('fp2_settings', JSON.stringify(settings)); }, [settings]);
+  useEffect(() => { localStorage.setItem('fp2_teams', JSON.stringify(teams)); }, [teams]);
+  useEffect(() => { localStorage.setItem('fp2_matches', JSON.stringify(matches)); }, [matches]);
+  useEffect(() => { localStorage.setItem('fp2_qualifiers', JSON.stringify(qualifiers)); }, [qualifiers]);
+  useEffect(() => { localStorage.setItem('fp2_ko', JSON.stringify(koMatches)); }, [koMatches]);
+
+  const standings = useMemo(() => calculateStandings(teams, matches), [teams, matches]);
+
+  const resolvedBracket: ResolvedKOMatch[] = useMemo(
+    () => resolveKnockout(koMatches, standings, qualifiers),
+    [koMatches, standings, qualifiers]
+  );
 
   const updateTeamName = useCallback((id: string, name: string) => {
     setTeams(prev => prev.map(t => t.id === id ? { ...t, name } : t));
@@ -65,15 +90,53 @@ export function usePoolState() {
     setMatches(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
   }, []);
 
-  const standingsA = useMemo(() => calculateStandings(teams, matches, 'A'), [teams, matches]);
-  const standingsB = useMemo(() => calculateStandings(teams, matches, 'B'), [teams, matches]);
+  const updateTeamCount = useCallback((newCount: number) => {
+    const prev = teamsRef.current;
+    let newTeams: Team[];
+    if (newCount > prev.length) {
+      newTeams = [
+        ...prev,
+        ...Array.from({ length: newCount - prev.length }, (_, i) => ({
+          id: `team-${prev.length + i + 1}`,
+          name: `Team ${prev.length + i + 1}`,
+        })),
+      ];
+    } else {
+      newTeams = prev.slice(0, newCount);
+    }
+    const newMatches = generateRoundRobinMatches(newTeams, settingsRef.current.legs);
+    setTeams(newTeams);
+    setSettings(s => ({ ...s, teamCount: newCount }));
+    setMatches(mergeMatches(newMatches, matchesRef.current));
+  }, []);
+
+  const updateLegs = useCallback((newLegs: number) => {
+    const newMatches = generateRoundRobinMatches(teamsRef.current, newLegs);
+    setSettings(s => ({ ...s, legs: newLegs }));
+    setMatches(mergeMatches(newMatches, matchesRef.current));
+  }, []);
+
+  const updateKoMatch = useCallback((id: string, updates: Partial<KnockoutMatch>) => {
+    setKoMatches(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+  }, []);
+
+  const updateQualifiers = useCallback((q: QualifierCount) => {
+    setQualifiers(q);
+    setKoMatches(generateKnockoutStructure(q));
+  }, []);
 
   return {
+    settings,
     teams,
     matches,
+    standings,
+    qualifiers,
+    resolvedBracket,
     updateTeamName,
     updateMatch,
-    standingsA,
-    standingsB,
+    updateTeamCount,
+    updateLegs,
+    updateKoMatch,
+    updateQualifiers,
   };
 }
