@@ -1,10 +1,57 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePoolState } from '@/hooks/usePoolState';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Match, Team } from '@/lib/poolLogic';
+
+function NumericInput({
+  value,
+  min,
+  max,
+  onCommit,
+  className,
+  style,
+  'data-testid': testId,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  onCommit: (v: number) => void;
+  className?: string;
+  style?: React.CSSProperties;
+  'data-testid'?: string;
+}) {
+  const [local, setLocal] = useState(String(value));
+
+  useEffect(() => {
+    setLocal(String(value));
+  }, [value]);
+
+  function commit(raw: string) {
+    const n = Number(raw);
+    const clamped = isNaN(n) ? value : Math.min(max, Math.max(min, Math.round(n)));
+    setLocal(String(clamped));
+    if (clamped !== value) onCommit(clamped);
+    else setLocal(String(clamped));
+  }
+
+  return (
+    <Input
+      type="number"
+      value={local}
+      className={className}
+      style={style}
+      data-testid={testId}
+      onChange={e => setLocal(e.target.value)}
+      onBlur={e => commit(e.target.value)}
+      onKeyDown={e => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+      }}
+    />
+  );
+}
 
 export default function FixturesPage() {
   const {
@@ -153,15 +200,11 @@ export default function FixturesPage() {
             <div className="space-y-2">
               <Label className="text-xs text-white/50 uppercase tracking-wider">Number of Pools</Label>
               <div className="flex items-center gap-3">
-                <Input
-                  type="number"
-                  min="1"
-                  max="4"
+                <NumericInput
                   value={settings.poolCount}
-                  onChange={e => {
-                    const v = Math.min(4, Math.max(1, Number(e.target.value)));
-                    if (!isNaN(v)) updatePoolCount(v);
-                  }}
+                  min={1}
+                  max={4}
+                  onCommit={updatePoolCount}
                   className="w-20 font-bold text-center text-white"
                   style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)' }}
                   data-testid="input-poolCount"
@@ -174,15 +217,11 @@ export default function FixturesPage() {
             <div className="space-y-2">
               <Label className="text-xs text-white/50 uppercase tracking-wider">Teams per Pool</Label>
               <div className="flex items-center gap-3">
-                <Input
-                  type="number"
-                  min="2"
-                  max="10"
+                <NumericInput
                   value={settings.teamsPerPool}
-                  onChange={e => {
-                    const v = Math.min(10, Math.max(2, Number(e.target.value)));
-                    if (!isNaN(v)) updateTeamsPerPool(v);
-                  }}
+                  min={2}
+                  max={10}
+                  onCommit={updateTeamsPerPool}
                   className="w-20 font-bold text-center text-white"
                   style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)' }}
                   data-testid="input-teamsPerPool"
@@ -195,15 +234,11 @@ export default function FixturesPage() {
             <div className="space-y-2">
               <Label className="text-xs text-white/50 uppercase tracking-wider">Number of Legs</Label>
               <div className="flex items-center gap-3">
-                <Input
-                  type="number"
-                  min="1"
-                  max="3"
+                <NumericInput
                   value={settings.legs}
-                  onChange={e => {
-                    const v = Math.min(3, Math.max(1, Number(e.target.value)));
-                    if (!isNaN(v)) updateLegs(v);
-                  }}
+                  min={1}
+                  max={3}
+                  onCommit={updateLegs}
                   className="w-20 font-bold text-center text-white"
                   style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)' }}
                   data-testid="input-legs"

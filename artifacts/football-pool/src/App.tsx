@@ -7,6 +7,7 @@ import FixturesPage from "@/pages/FixturesPage";
 import StandingsPage from "@/pages/StandingsPage";
 import KnockoutPage from "@/pages/KnockoutPage";
 import PrintExport from "@/components/PrintExport";
+import { useAuth } from "@workspace/replit-auth-web";
 
 const queryClient = new QueryClient();
 
@@ -15,6 +16,31 @@ const NAV_TABS = [
   { href: "/standings",  label: "📊 Points Table",  testId: "nav-standings"   },
   { href: "/knockout",   label: "🏆 Knockout",      testId: "nav-knockout"    },
 ];
+
+function AuthButton() {
+  const { user, isLoading, isAuthenticated, login, logout } = useAuth();
+  if (isLoading) return null;
+  if (isAuthenticated) {
+    return (
+      <button
+        onClick={logout}
+        className="shrink-0 text-xs font-semibold text-white/70 hover:text-white border border-white/20 hover:border-white/40 rounded-md px-3 py-1.5 transition-colors"
+        data-testid="btn-logout"
+      >
+        {user?.firstName ? `Sign out (${user.firstName})` : "Sign out"}
+      </button>
+    );
+  }
+  return (
+    <button
+      onClick={login}
+      className="shrink-0 text-xs font-semibold text-white bg-primary hover:bg-primary/90 rounded-md px-3 py-1.5 transition-colors shadow shadow-primary/30"
+      data-testid="btn-login"
+    >
+      Log In
+    </button>
+  );
+}
 
 function Navigation() {
   const [location] = useLocation();
@@ -33,7 +59,7 @@ function Navigation() {
         </div>
 
         {/* Tabs */}
-        <nav className="flex h-full overflow-x-auto scrollbar-hide">
+        <nav className="flex h-full overflow-x-auto scrollbar-hide flex-1">
           {NAV_TABS.map(({ href, label, testId }) => {
             const active = location === href;
             return (
@@ -55,6 +81,9 @@ function Navigation() {
             );
           })}
         </nav>
+
+        {/* Auth */}
+        <AuthButton />
       </div>
     </header>
   );
