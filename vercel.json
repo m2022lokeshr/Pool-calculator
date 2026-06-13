@@ -1,6 +1,5 @@
 {
-  "rootDirectory": "artifacts/football-pool",
-  "buildCommand": "pnpm run build",
-  "outputDirectory": "dist/public",
+  "buildCommand": "cd artifacts/football-pool && pnpm run build",
+  "outputDirectory": "artifacts/football-pool/dist/public",
   "installCommand": "pnpm install"
 }
