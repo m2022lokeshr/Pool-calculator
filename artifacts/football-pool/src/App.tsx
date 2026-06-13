@@ -20,23 +20,25 @@ const NAV_TABS = [
 ];
 
 function AuthButton() {
-  const [user, setUser] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      setIsLoading(false)
-    })
+      setUser(session?.user ?? null);
+      setIsLoading(false);
+    });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-    })
+      setUser(session?.user ?? null);
+    });
 
-    return () => listener?.subscription.unsubscribe()
-  }, [])
+    return () => listener?.subscription.unsubscribe();
+  }, []);
 
-  if (isLoading) return null
+  if (isLoading) return null;
 
   if (user) {
     return (
@@ -47,18 +49,40 @@ function AuthButton() {
       >
         {user.email ? `Sign out (${user.email})` : "Sign out"}
       </button>
-    )
+    );
   }
 
   return (
-    <button
-      onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })}
-      className="shrink-0 text-xs font-semibold text-white bg-primary hover:bg-primary/90 rounded-md px-3 py-1.5 transition-colors shadow shadow-primary/30"
-      data-testid="btn-login"
-    >
-      Log In
-    </button>
-  )
+    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+      <input
+        type="email"
+        placeholder="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #ccc' }}
+      />
+      <input
+        type="password"
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #ccc' }}
+      />
+      <button
+        onClick={async () => {
+          const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+          if (error) alert(error.message);
+        }}
+        className="shrink-0 text-xs font-semibold text-white bg-primary hover:bg-primary/90 rounded-md px-3 py-1.5 transition-colors shadow shadow-primary/30"
+        data-testid="btn-login"
+      >
+        Log In
+      </button>
+    </div>
+  );
 }
 
 function Navigation() {
