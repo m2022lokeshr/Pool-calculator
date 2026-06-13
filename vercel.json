@@ -1,5 +1,5 @@
 {
   "buildCommand": "pnpm --filter @workspace/football-pool run build",
-  "outputDirectory": "artifacts/football-pool/dist/public",
+  "outputDirectory": "artifacts/football-pool/dist",
   "installCommand": "pnpm install"
 }
