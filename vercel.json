@@ -1,6 +1,6 @@
 {
-  "buildCommand": "pnpm --filter @workspace/football-pool run build",
-  "outputDirectory": "artifacts/football-pool/dist",
-  "installCommand": "pnpm install",
-  "framework": "vite"
+  "rootDirectory": "artifacts/football-pool",
+  "buildCommand": "pnpm run build",
+  "outputDirectory": "dist/public",
+  "installCommand": "pnpm install"
 }
