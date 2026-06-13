@@ -7,7 +7,9 @@ import FixturesPage from "@/pages/FixturesPage";
 import StandingsPage from "@/pages/StandingsPage";
 import KnockoutPage from "@/pages/KnockoutPage";
 import PrintExport from "@/components/PrintExport";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useState } from "react";
+import { supabase } from './supabaseClient'
+import { useEffect, useState } from 'react'
 
 const queryClient = new QueryClient();
 
@@ -18,28 +20,45 @@ const NAV_TABS = [
 ];
 
 function AuthButton() {
-  const { user, isLoading, isAuthenticated, login, logout } = useAuth();
-  if (isLoading) return null;
-  if (isAuthenticated) {
+  const [user, setUser] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null)
+      setIsLoading(false)
+    })
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => listener?.subscription.unsubscribe()
+  }, [])
+
+  if (isLoading) return null
+
+  if (user) {
     return (
       <button
-        onClick={logout}
+        onClick={() => supabase.auth.signOut()}
         className="shrink-0 text-xs font-semibold text-white/70 hover:text-white border border-white/20 hover:border-white/40 rounded-md px-3 py-1.5 transition-colors"
         data-testid="btn-logout"
       >
-        {user?.firstName ? `Sign out (${user.firstName})` : "Sign out"}
+        {user.email ? `Sign out (${user.email})` : "Sign out"}
       </button>
-    );
+    )
   }
+
   return (
     <button
-      onClick={login}
+      onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })}
       className="shrink-0 text-xs font-semibold text-white bg-primary hover:bg-primary/90 rounded-md px-3 py-1.5 transition-colors shadow shadow-primary/30"
       data-testid="btn-login"
     >
       Log In
     </button>
-  );
+  )
 }
 
 function Navigation() {
