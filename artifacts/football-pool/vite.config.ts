@@ -4,9 +4,11 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
-const rawPort = process.env.PORT;
+// --- REPLACE THIS SECTION ---
+const rawPort = process.env.PORT || '3000';  // Default to 3000 if missing
 
 if (!rawPort) {
+  // We will never reach here because we set a default above, but keep the check just in case.
   throw new Error(
     "PORT environment variable is required but was not provided.",
   );
@@ -18,7 +20,7 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-const basePath = process.env.BASE_PATH;
+const basePath = process.env.BASE_PATH || '/';  // Default to '/' if missing
 
 if (!basePath) {
   throw new Error(
