@@ -7,9 +7,8 @@ import FixturesPage from "@/pages/FixturesPage";
 import StandingsPage from "@/pages/StandingsPage";
 import KnockoutPage from "@/pages/KnockoutPage";
 import PrintExport from "@/components/PrintExport";
-import { useState } from "react";
+import { useState' useEffect } from "react";
 import { supabase } from './supabaseClient'
-import { useEffect, useState } from 'react'
 
 const queryClient = new QueryClient();
 
