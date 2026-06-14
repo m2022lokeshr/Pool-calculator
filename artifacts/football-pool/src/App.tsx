@@ -24,6 +24,7 @@ function AuthButton() {
   const [isLoading, setIsLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -53,33 +54,55 @@ function AuthButton() {
   }
 
   return (
-    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
       <input
         type="email"
         placeholder="Email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #ccc' }}
+        style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #ccc', width: '120px' }}
       />
       <input
         type="password"
         placeholder="Password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #ccc' }}
+        style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #ccc', width: '100px' }}
       />
       <button
         onClick={async () => {
-          const { error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
-          if (error) alert(error.message);
+          if (isSignUp) {
+            const { error } = await supabase.auth.signUp({
+              email,
+              password,
+            });
+            if (error) alert(error.message);
+            else alert('Account created! Now switch to Log In.');
+          } else {
+            const { error } = await supabase.auth.signInWithPassword({
+              email,
+              password,
+            });
+            if (error) alert(error.message);
+          }
         }}
         className="shrink-0 text-xs font-semibold text-white bg-primary hover:bg-primary/90 rounded-md px-3 py-1.5 transition-colors shadow shadow-primary/30"
         data-testid="btn-login"
       >
-        Log In
+        {isSignUp ? 'Sign Up' : 'Log In'}
+      </button>
+      <button
+        onClick={() => setIsSignUp(!isSignUp)}
+        style={{
+          fontSize: '12px',
+          color: '#666',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          textDecoration: 'underline'
+        }}
+      >
+        {isSignUp ? 'Switch to Log In' : 'Switch to Sign Up'}
       </button>
     </div>
   );
