@@ -9,6 +9,7 @@ import KnockoutPage from "@/pages/KnockoutPage";
 import PrintExport from "@/components/PrintExport";
 import { useState, useEffect } from "react";
 import { supabase } from './supabaseClient'
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 const queryClient = new QueryClient();
 
@@ -183,6 +184,7 @@ function App() {
           <PrintExport />
         </WouterRouter>
         <Toaster />
+        <SpeedInsights />
       </TooltipProvider>
     </QueryClientProvider>
   );
