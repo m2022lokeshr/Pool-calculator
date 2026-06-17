@@ -12,7 +12,6 @@ import { supabase } from './supabaseClient'
 import type { User } from '@supabase/supabase-js';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { useAuthReady } from '@/hooks/useAuthReady'
-
 declare global {
   interface Window {
     adsbygoogle?: { push: (params: unknown) => void } | any[];
@@ -33,6 +32,7 @@ function AuthButton() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
+  const [, navigate] = useLocation()
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -52,7 +52,10 @@ function AuthButton() {
   if (user) {
     return (
       <button
-        onClick={() => supabase.auth.signOut()}
+        onClick={async () => {
+          await supabase.auth.signOut();
+          navigate('/');
+        }}
         className="shrink-0 text-xs font-semibold text-white/70 hover:text-white border border-white/20 hover:border-white/40 rounded-md px-3 py-1.5 transition-colors"
         data-testid="btn-logout"
       >

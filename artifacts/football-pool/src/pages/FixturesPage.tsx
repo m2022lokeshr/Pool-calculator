@@ -97,10 +97,11 @@ export default function FixturesPage() {
   const [loading, setLoading] = useState(true);
 
 useEffect(() => {
-  supabase.auth.getUser().then(({ data: { user } }) => {
-    setUser(user);
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    setUser(session?.user ?? null);
     setLoading(false);
   });
+  return () => subscription.unsubscribe();
 }, []);
   // ✅ All state declarations first
 const [pools, setPools] = useState<FixturePool[]>([]);
@@ -117,12 +118,12 @@ const playedMatches = matches.filter(
 
 // ✅ Effects after state
 useEffect(() => {
-  supabase.auth.getUser().then(({ data }) => {
-    setUser(data.user);
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    setUser(session?.user ?? null);
     setLoading(false);
   });
+  return () => subscription.unsubscribe();
 }, []);
-
 useEffect(() => {
   if (!user) return;
 
