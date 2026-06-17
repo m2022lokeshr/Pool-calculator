@@ -1,6 +1,17 @@
 import { usePoolState } from '@/hooks/usePoolState';
 import { Standing, Match, Team, Pool, getRoundLabel, getMatchLabel, generatePoolSeeding } from '@/lib/poolLogic';
 
+function matchNumberValue(match: Match): number {
+  const value = Number(match.matchNumber);
+  return Number.isFinite(value) ? value : Number.MAX_SAFE_INTEGER;
+}
+
+function sortMatchesByNumber(matches: Match[]): Match[] {
+  return [...matches].sort((a, b) =>
+    matchNumberValue(a) - matchNumberValue(b) || a.id.localeCompare(b.id)
+  );
+}
+
 function fmt(dateStr: string): string {
   if (!dateStr) return '—';
   try {
@@ -28,6 +39,13 @@ function PrintPoolFixtures({ pool, matches, teams }: { pool: Pool; matches: Matc
           </tr>
         </thead>
         <tbody>
+          {matches.length === 0 && (
+            <tr>
+              <td colSpan={6} style={{ textAlign: 'center', color: '#777', fontStyle: 'italic' }}>
+                No fixtures generated for this pool.
+              </td>
+            </tr>
+          )}
           {matches.map(m => {
             const played = m.homeGoals !== null && m.awayGoals !== null;
             const res = played
@@ -98,7 +116,18 @@ function PrintPoolStandings({ pool, standings, qualifiersPerPool }: { pool: Pool
 }
 
 export default function PrintExport() {
-  const { pools, teams, matches, poolStandings, resolvedBracket, qualifiers, settings } = usePoolState();
+  const {
+    isLoading,
+    isSignedIn,
+    pools,
+    teams,
+    matches,
+    poolStandings,
+    resolvedBracket,
+    qualifiers,
+    settings,
+    refresh,
+  } = usePoolState();
 
   const totalRounds   = Math.log2(qualifiers);
   const champion      = resolvedBracket.find(m => m.round === 1)?.winner ?? null;
@@ -114,27 +143,40 @@ export default function PrintExport() {
   }
 
   const seededStandings = generatePoolSeeding(poolStandings, qualifiers);
+  const canPrint = isSignedIn && !isLoading && pools.length > 0;
+
+  async function handlePrint() {
+    if (!isSignedIn) {
+      alert('Please log in before exporting your tournament report.');
+      return;
+    }
+
+    await refresh?.();
+    await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
+    window.print();
+  }
 
   return (
     <>
       <button
-        onClick={() => window.print()}
+        onClick={handlePrint}
+        disabled={isLoading}
         data-testid="button-print-export"
-        className="no-print fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-full font-semibold text-sm text-white shadow-xl transition-all hover:scale-105 active:scale-95"
+        className="no-print fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-full font-semibold text-sm text-white shadow-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-60 disabled:hover:scale-100"
         style={{
           background: 'linear-gradient(135deg, rgba(34,197,94,0.9), rgba(22,163,74,0.95))',
           backdropFilter: 'blur(10px)',
           border: '1px solid rgba(74,222,128,0.4)',
           boxShadow: '0 4px 24px rgba(34,197,94,0.35), 0 2px 8px rgba(0,0,0,0.3)',
         }}
-        title="Export as PDF"
+        title={isLoading ? 'Loading tournament data' : 'Export as PDF'}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="6 9 6 2 18 2 18 9" />
           <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
           <rect x="6" y="14" width="12" height="8" />
         </svg>
-        Print / Export PDF
+        {isLoading ? 'Loading report...' : 'Print / Export PDF'}
       </button>
 
       <div className="print-only print-document">
@@ -145,32 +187,51 @@ export default function PrintExport() {
         </div>
 
         <div className="print-body">
-          {/* Fixtures per pool */}
-          <h2 className="print-section-heading">Pool Fixtures</h2>
-          {pools.map(pool => (
-            <PrintPoolFixtures
-              key={pool.id}
-              pool={pool}
-              matches={matches.filter(m => m.poolId === pool.id)}
-              teams={teams}
-            />
-          ))}
+          {!canPrint && (
+            <div className="print-section">
+              <h2 className="print-section-heading">Tournament Data</h2>
+              <p className="print-empty-text">
+                {isSignedIn
+                  ? 'Tournament data is still loading. Close this print preview and try again in a moment.'
+                  : 'Please log in to print your tournament report.'}
+              </p>
+            </div>
+          )}
 
-          <div className="print-page-break" />
+          {/* Fixtures per pool */}
+          {canPrint && (
+            <>
+              <h2 className="print-section-heading">Pool Fixtures</h2>
+              {pools.map(pool => (
+                <PrintPoolFixtures
+                  key={pool.id}
+                  pool={pool}
+                  matches={sortMatchesByNumber(matches.filter(m => m.poolId === pool.id))}
+                  teams={teams}
+                />
+              ))}
+            </>
+          )}
+
+          {canPrint && <div className="print-page-break" />}
 
           {/* Standings per pool */}
-          <h2 className="print-section-heading">Pool Standings</h2>
-          {pools.map((pool, pi) => (
-            <PrintPoolStandings
-              key={pool.id}
-              pool={pool}
-              standings={poolStandings[pi] ?? []}
-              qualifiersPerPool={qualifiersPerPool}
-            />
-          ))}
+          {canPrint && (
+            <>
+              <h2 className="print-section-heading">Pool Standings</h2>
+              {pools.map((pool, pi) => (
+                <PrintPoolStandings
+                  key={pool.id}
+                  pool={pool}
+                  standings={poolStandings[pi] ?? []}
+                  qualifiersPerPool={qualifiersPerPool}
+                />
+              ))}
+            </>
+          )}
 
           {/* Knockout */}
-          {koRounds.length > 0 && (
+          {canPrint && koRounds.length > 0 && (
             <>
               <div className="print-page-break" />
               <h2 className="print-section-heading">Knockout Stage</h2>
@@ -239,7 +300,7 @@ export default function PrintExport() {
             </>
           )}
 
-          {champion && (
+          {canPrint && champion && (
             <div className="print-finalists" style={{ marginTop: '20px' }}>
               <div className="print-finalists-title">🏆 Tournament Champion</div>
               <div style={{ textAlign: 'center', fontSize: '22px', fontWeight: 900, color: '#b45309' }}>
@@ -248,7 +309,7 @@ export default function PrintExport() {
             </div>
           )}
 
-          {!champion && seededStandings.length >= 2 && (
+          {canPrint && !champion && seededStandings.length >= 2 && (
             <div className="print-finalists">
               <div className="print-finalists-title">🏆 Finalists</div>
               <div className="print-finalists-row">
