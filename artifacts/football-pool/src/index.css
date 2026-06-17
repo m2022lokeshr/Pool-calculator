@@ -456,6 +456,12 @@
     margin-bottom: 10px;
   }
 
+  .print-empty-text {
+    color: #666 !important;
+    font-size: 11px;
+    margin: 10px 0 0 0;
+  }
+
   .print-page-break {
     page-break-before: always;
     break-before: page;
