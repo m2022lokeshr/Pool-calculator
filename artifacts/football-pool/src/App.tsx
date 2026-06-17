@@ -253,11 +253,15 @@ function App() {
    const [location] = useLocation(); // Gets the current page URL
 // 👇 ADD THIS useEffect 👇
 useEffect(() => {
-    // Refresh AdSense ads whenever the route changes
-    if (window.adsbygoogle) {
-       window.adsbygoogle.push({});
-    }
-  }, [location]); // Runs this effect whenever the location changes
+  try {
+    const ads = document.querySelectorAll('ins.adsbygoogle')
+    ads.forEach(ad => {
+      if (!ad.getAttribute('data-adsbygoogle-status')) {
+        (window.adsbygoogle = window.adsbygoogle || []).push({})
+      }
+    })
+  } catch (e) {}
+}, [location]) // Runs this effect whenever the location changes
 if (!ready) return null 
   return (
     <QueryClientProvider client={queryClient}>
