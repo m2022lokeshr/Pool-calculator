@@ -248,7 +248,7 @@ function App() {
       window.adsbygoogle.push({});
     }
   }, [location])
-}; 
+ 
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
