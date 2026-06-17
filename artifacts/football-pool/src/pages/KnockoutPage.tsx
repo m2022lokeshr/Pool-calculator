@@ -95,12 +95,13 @@ function KoMatchCard({
 }
 
 export default function KnockoutPage() {
-  const { qualifiers, resolvedBracket, pools, poolStandings, updateKoMatch, updateQualifiers, settings } = usePoolState();
+  const { qualifiers, resolvedBracket, pools, poolStandings, matches, updateKoMatch, updateQualifiers, settings } = usePoolState();
 
   const totalRounds = Math.log2(qualifiers);
   const qualifiersPerPool = qualifiers / settings.poolCount;
   const unevenSplit = !Number.isInteger(qualifiersPerPool);
   const enoughTeams = poolStandings.every(ps => ps.length >= Math.ceil(qualifiers / settings.poolCount));
+  const hasCompletedMatches = matches.some(m => m.homeGoals !== null && m.awayGoals !== null);
 
   const seededStandings = generatePoolSeeding(poolStandings, qualifiers);
 
@@ -152,7 +153,7 @@ export default function KnockoutPage() {
       </div>
 
       {/* Champion banner */}
-      {champion && (
+      {hasCompletedMatches && champion && (
         <div
           className="mb-8 rounded-2xl p-5 text-center"
           style={{
@@ -170,43 +171,49 @@ export default function KnockoutPage() {
       )}
 
       {/* Bracket */}
-      <div className="space-y-8">
-        {rounds.map(({ round, label, matches }) => (
-          <div key={round}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="h-px flex-1 bg-white/10" />
-              <span className="text-white/50 text-xs font-bold uppercase tracking-widest px-3">{label}</span>
-              <div className="h-px flex-1 bg-white/10" />
+      {hasCompletedMatches ? (
+        <div className="space-y-8">
+          {rounds.map(({ round, label, matches }) => (
+            <div key={round}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-px flex-1 bg-white/10" />
+                <span className="text-white/50 text-xs font-bold uppercase tracking-widest px-3">{label}</span>
+                <div className="h-px flex-1 bg-white/10" />
+              </div>
+              <div
+                className={`grid gap-4 ${
+                  matches.length === 1
+                    ? 'max-w-sm mx-auto'
+                    : matches.length === 2
+                    ? 'grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto'
+                    : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
+                }`}
+              >
+                {matches.map(m => (
+                  <KoMatchCard
+                    key={m.id}
+                    match={m}
+                    label={getMatchLabel(m.round, m.slot, totalRounds)}
+                    isFinal={m.round === 1}
+                    onUpdate={handleUpdate}
+                  />
+                ))}
+              </div>
             </div>
-            <div
-              className={`grid gap-4 ${
-                matches.length === 1
-                  ? 'max-w-sm mx-auto'
-                  : matches.length === 2
-                  ? 'grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto'
-                  : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
-              }`}
-            >
-              {matches.map(m => (
-                <KoMatchCard
-                  key={m.id}
-                  match={m}
-                  label={getMatchLabel(m.round, m.slot, totalRounds)}
-                  isFinal={m.round === 1}
-                  onUpdate={handleUpdate}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="glass-card rounded-xl p-6 text-center text-white/45 text-sm">
+          Enter fixture results first. The knockout bracket clears automatically when pool results are removed.
+        </div>
+      )}
 
       {/* Seeding by pool */}
       <div className="mt-8 glass-card rounded-xl p-5">
         <div className="text-white/40 text-xs font-bold uppercase tracking-wider mb-4">
           Seeding from Pool Standings
         </div>
-        {pools.length > 1 ? (
+        {hasCompletedMatches && pools.length > 1 ? (
           <div className="space-y-3">
             {pools.map((pool, pi) => {
               const c = POOL_COLORS[pi] ?? POOL_COLORS[0];
@@ -241,7 +248,7 @@ export default function KnockoutPage() {
               );
             })}
           </div>
-        ) : (
+        ) : hasCompletedMatches ? (
           <div className="flex flex-wrap gap-2">
             {seededStandings.map((s, i) => (
               <div
@@ -257,6 +264,8 @@ export default function KnockoutPage() {
               </div>
             ))}
           </div>
+        ) : (
+          <span className="text-white/25 text-xs italic">No pool results yet</span>
         )}
       </div>
     </div>
