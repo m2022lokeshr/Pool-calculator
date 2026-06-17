@@ -239,6 +239,16 @@ function Router() {
 }
 
 function App() {
+    const [location] = useLocation(); // Gets the current page URL
+
+  // 👇 ADD THIS useEffect 👇
+  useEffect(() => {
+    // Refresh AdSense ads whenever the route changes
+    if (window.adsbygoogle) {
+      window.adsbygoogle.push({});
+    }
+  }, [location])
+ 
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
