@@ -124,7 +124,7 @@ function LandingPage() {
   const [, navigate] = useLocation();
 
   return (
-    <div className="min-h-[100dvh] flex flex-col items-center justify-center text-center px-4 relative overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center justify-center text-center px-4 relative overflow-hidden">
 
       {/* Glow orbs */}
       <div className="absolute w-96 h-96 rounded-full bg-primary/10 blur-3xl top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
@@ -267,7 +267,7 @@ if (!ready) return null
           <div className="pitch-bg-image" aria-hidden="true" />
           <div className="pitch-bg-overlay" aria-hidden="true" />
 
-          <div className="min-h-[100dvh] flex flex-col selection:bg-primary/30">
+          <div className="min-h-screen flex flex-col selection:bg-primary/30">
             <Navigation />
             <main className="flex-1">
               <Router />
