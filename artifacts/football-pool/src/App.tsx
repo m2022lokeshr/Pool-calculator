@@ -11,6 +11,13 @@ import { useState, useEffect } from "react";
 import { supabase } from './supabaseClient'
 import type { User } from '@supabase/supabase-js';
 import { SpeedInsights } from '@vercel/speed-insights/react';
+import { useAuthReady } from '@/hooks/useAuthReady'
+
+declare global {
+  interface Window {
+    adsbygoogle?: { push: (params: unknown) => void } | any[];
+  }
+}
 
 const queryClient = new QueryClient();
 
@@ -239,16 +246,16 @@ function Router() {
 }
 
 function App() {
-    const [location] = useLocation(); // Gets the current page URL
-
-  // 👇 ADD THIS useEffect 👇
-  useEffect(() => {
+   const ready = useAuthReady()
+   const [location] = useLocation(); // Gets the current page URL
+// 👇 ADD THIS useEffect 👇
+useEffect(() => {
     // Refresh AdSense ads whenever the route changes
     if (window.adsbygoogle) {
-      window.adsbygoogle.push({});
+       window.adsbygoogle.push({});
     }
-  }, [location])
- 
+  }, [location]); // Runs this effect whenever the location changes
+if (!ready) return null 
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
