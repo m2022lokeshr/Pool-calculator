@@ -15,6 +15,7 @@ type FixtureSettings = {
 type FixturePool = {
   id: number;
   name: string;
+  share_token?: string;
 };
 
 type FixtureTeam = {
@@ -197,9 +198,11 @@ const syncPoolsAndTeams = async (newPoolCount: number, newTeamsPerPool: number) 
   if (newPoolCount > pools.length) {
     // Add missing pools + their teams
     for (let i = pools.length; i < newPoolCount; i++) {
+      // Generate a simple share token
+      const shareToken = Math.random().toString(36).substring(2, 9);
       const { data: newPool } = await supabase
         .from('pools')
-        .insert({ user_id: user.id, name: `Pool ${String.fromCharCode(65 + i)}` })
+        .insert({ user_id: user.id, name: `Pool ${String.fromCharCode(65 + i)}`, share_token: shareToken })
         .select()
         .single();
 
@@ -657,14 +660,28 @@ if (!user) return <div style={{ textAlign: 'center', padding: '50px' }}>Please l
     </button>
   )}
   {poolMatches.length > 0 && (
-  <button
-      onClick={() => confirm(`Delete all fixtures for ${pool.name}?`) && deletePoolFixtures(pool.id)}
-      className="text-xs font-medium px-3 py-1.5 rounded-md border
-                 text-red-400 bg-red-500/10 border-red-500/30
-                 hover:bg-red-500/20 transition-colors duration-150"
-    >
-      🗑 Delete
-    </button>
+    <>
+      <button
+        onClick={() => confirm(`Delete all fixtures for ${pool.name}?`) && deletePoolFixtures(pool.id)}
+        className="text-xs font-medium px-3 py-1.5 rounded-md border
+                   text-red-400 bg-red-500/10 border-red-500/30
+                   hover:bg-red-500/20 transition-colors duration-150"
+      >
+        🗑 Delete
+      </button>
+      <button
+        onClick={() => {
+          const shareUrl = `${window.location.origin}/view/${pool.share_token}`
+          navigator.clipboard.writeText(shareUrl)
+          alert('Link copied!')
+        }}
+        className="text-xs font-medium px-3 py-1.5 rounded-md border
+                   text-blue-400 bg-blue-500/10 border-blue-500/30
+                   hover:bg-blue-500/20 transition-colors duration-150"
+      >
+        🔗 Share
+      </button>
+    </>
   )}
  </div>
 </div>

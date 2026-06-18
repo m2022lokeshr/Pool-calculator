@@ -12,6 +12,7 @@ import { supabase } from './supabaseClient'
 import type { User } from '@supabase/supabase-js';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { useAuthReady } from '@/hooks/useAuthReady'
+import ViewPage from './pages/ViewPage'
 declare global {
   interface Window {
     adsbygoogle?: { push: (params: unknown) => void } | any[];
@@ -46,7 +47,6 @@ function AuthButton() {
 
     return () => listener?.subscription.unsubscribe();
   }, []);
-
   if (isLoading) return null;
 
   if (user) {
@@ -243,7 +243,9 @@ function Router() {
       <Route path="/fixtures" component={FixturesPage} />
       <Route path="/standings" component={StandingsPage} />
       <Route path="/knockout" component={KnockoutPage} />
+      <Route path="/view/:token" component={ViewPage} />
       <Route component={NotFound} />
+      
     </Switch>
   );
 }
