@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import type { User } from '@supabase/supabase-js';
 import { Card, CardContent } from '@/components/ui/card';
@@ -93,273 +93,334 @@ function NumericInput({
   );
 }
 
+// ── Debounced input components ──────────────────────────────────────────────
+// These hold local state for instant typing feedback and only write to Supabase
+// after the user stops typing for 600 ms, eliminating per-keystroke DB calls.
+
+function TeamNameInput({ team, base, onUpdate }: {
+  team: FixtureTeam;
+  base: string;
+  onUpdate: (id: number, name: string) => void;
+}) {
+  const [localName, setLocalName] = useState(team.name);
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => { setLocalName(team.name); }, [team.name]);
+  function handleChange(e: { target: { value: string } }) {
+    const val = e.target.value;
+    setLocalName(val);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => onUpdate(team.id, val), 600);
+  }
+  return (
+    <Input
+      value={localName}
+      onChange={handleChange}
+      className="font-medium text-white h-8 text-sm"
+      style={{ background: `${base},0.08)`, border: `1px solid ${base},0.2)` }}
+      data-testid={`input-team-${team.id}`}
+    />
+  );
+}
+
+function PoolNameInput({ pool, pi, base, onUpdate }: {
+  pool: FixturePool;
+  pi: number;
+  base: string;
+  onUpdate: (pi: number, name: string) => void;
+}) {
+  const [localName, setLocalName] = useState(pool.name);
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => { setLocalName(pool.name); }, [pool.name]);
+  function handleChange(e: { target: { value: string } }) {
+    const val = e.target.value;
+    setLocalName(val);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => onUpdate(pi, val), 600);
+  }
+  return (
+    <input
+      value={localName}
+      onChange={handleChange}
+      className="font-display text-2xl font-bold text-white tracking-wide bg-transparent border-none outline-none focus:underline decoration-dashed decoration-white/30 underline-offset-4 min-w-0 flex-1"
+      style={{ caretColor: `${base},1)` }}
+      aria-label={`Rename ${pool.name}`}
+      data-testid={`input-pool-name-${pool.id}`}
+    />
+  );
+}
+
+function ScoreInput({ matchId, field, value, onUpdate }: {
+  matchId: number;
+  field: 'home_goals' | 'away_goals';
+  value: number | null;
+  onUpdate: (id: number, updates: Partial<FixtureMatch>) => void;
+}) {
+  const [local, setLocal] = useState(value === null ? '' : String(value));
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => { setLocal(value === null ? '' : String(value)); }, [value]);
+  function handleChange(e: { target: { value: string } }) {
+    const raw = e.target.value;
+    setLocal(raw);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      onUpdate(matchId, { [field]: raw === '' ? null : Number(raw) });
+    }, 600);
+  }
+  return (
+    <Input
+      type="number"
+      min="0"
+      value={local}
+      onChange={handleChange}
+      placeholder="—"
+      className="w-12 h-8 text-center font-bold"
+      style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+    />
+  );
+}
+
+function MatchNumberInput({ match, onUpdate }: {
+  match: FixtureMatch;
+  onUpdate: (id: number, updates: Partial<FixtureMatch>) => void;
+}) {
+  const [local, setLocal] = useState(String(match.match_number ?? ''));
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => { setLocal(String(match.match_number ?? '')); }, [match.match_number]);
+  function handleChange(e: { target: { value: string } }) {
+    const val = e.target.value;
+    setLocal(val);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      onUpdate(match.id, { match_number: val });
+    }, 600);
+  }
+  return (
+    <Input
+      value={local}
+      onChange={handleChange}
+      placeholder="#"
+      className="h-8 text-center text-xs font-mono"
+      style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+    />
+  );
+}
+
 export default function FixturesPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-useEffect(() => {
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-    setUser(session?.user ?? null);
-    setLoading(false);
-  });
-  return () => subscription.unsubscribe();
-}, []);
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
   // ✅ All state declarations first
-const [pools, setPools] = useState<FixturePool[]>([]);
-const [teams, setTeams] = useState<FixtureTeam[]>([]);
-const [matches, setMatches] = useState<FixtureMatch[]>([]);
-const [settings, setSettings] = useState<FixtureSettings>({ poolCount: 2, teamsPerPool: 4, legs: 1 });
-const [settingsOpen, setSettingsOpen] = useState(false);
+  const [pools, setPools] = useState<FixturePool[]>([]);
+  const [teams, setTeams] = useState<FixtureTeam[]>([]);
+  const [matches, setMatches] = useState<FixtureMatch[]>([]);
+  const [settings, setSettings] = useState<FixtureSettings>({ poolCount: 2, teamsPerPool: 4, legs: 1 });
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
-// ✅ Derived values
-const totalMatches = matches.length;
-const playedMatches = matches.filter(
-  m => m.home_goals !== null && m.away_goals !== null
-).length;
+  // ✅ Derived values
+  const totalMatches = matches.length;
+  const playedMatches = matches.filter(
+    m => m.home_goals !== null && m.away_goals !== null
+  ).length;
 
-// ✅ Effects after state
-useEffect(() => {
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-    setUser(session?.user ?? null);
-    setLoading(false);
-  });
-  return () => subscription.unsubscribe();
-}, []);
-useEffect(() => {
-  if (!user) return;
+  useEffect(() => {
+    if (!user) return;
 
-  const fetchData = async () => {
-    const { data: poolsData } = await supabase
-      .from('pools').select('*').eq('user_id', user.id);
-    if (poolsData) setPools(poolsData);
+    const fetchData = async () => {
+      const { data: poolsData } = await supabase
+        .from('pools').select('*').eq('user_id', user.id);
+      if (poolsData) setPools(poolsData);
 
-    const { data: teamsData } = await supabase
-   .from('teams').select('*').eq('user_id', user.id).order('id');
-    if (teamsData) setTeams(teamsData);
+      const { data: teamsData } = await supabase
+        .from('teams').select('*').eq('user_id', user.id).order('id');
+      if (teamsData) setTeams(teamsData);
 
-    const { data: matchesData } = await supabase
-  .from('matches').select('*').eq('user_id', user.id).order('match_number');
-    if (matchesData) setMatches(sortMatchesByNumber(matchesData));
-    
-  const { data: settingsData } = await supabase
-      .from('settings').select('*').eq('user_id', user.id).maybeSingle();
-    if (settingsData) {
-      setSettings({
-        poolCount: settingsData.pool_count ?? settings.poolCount,
-        teamsPerPool: settingsData.teams_per_pool ?? settings.teamsPerPool,
-        legs: settingsData.legs ?? settings.legs,
-      });
-    }
+      const { data: matchesData } = await supabase
+        .from('matches').select('*').eq('user_id', user.id).order('match_number');
+      if (matchesData) setMatches(sortMatchesByNumber(matchesData));
+
+      const { data: settingsData } = await supabase
+        .from('settings').select('*').eq('user_id', user.id).maybeSingle();
+      if (settingsData) {
+        setSettings({
+          poolCount: settingsData.pool_count ?? settings.poolCount,
+          teamsPerPool: settingsData.teams_per_pool ?? settings.teamsPerPool,
+          legs: settingsData.legs ?? settings.legs,
+        });
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
+  // --- update functions ---
+  const updateTeamName = async (teamId: number, newName: string) => {
+    await supabase.from('teams').update({ name: newName }).eq('id', teamId);
+    setTeams(prev => prev.map(t => t.id === teamId ? { ...t, name: newName } : t));
   };
 
-  fetchData();
-}, [user]);
+  // ✅ Add these right here
+  const deletePoolFixtures = async (poolId: number) => {
+    await supabase.from('matches').delete().eq('pool_id', poolId);
+    setMatches(prev => prev.filter(m => m.pool_id !== poolId));
+  };
 
-// --- update functions ---
-const updateTeamName = async (teamId: number, newName: string) => {
-  await supabase.from('teams').update({ name: newName }).eq('id', teamId);
-  setTeams(prev => prev.map(t => t.id === teamId ? { ...t, name: newName } : t));
-};
+  const clearPoolScores = async (poolId: number) => {
+    await supabase.from('matches')
+      .update({ home_goals: null, away_goals: null })
+      .eq('pool_id', poolId);
+    setMatches(prev =>
+      prev.map(m =>
+        m.pool_id === poolId
+          ? { ...m, home_goals: null, away_goals: null }
+          : m
+      )
+    );
+  };
 
-// ✅ Add these right here
-const deletePoolFixtures = async (poolId: number) => {
-  await supabase.from('matches').delete().eq('pool_id', poolId);
-  setMatches(prev => prev.filter(m => m.pool_id !== poolId));
-};
+  const updateMatch = async (matchId: number, updates: Partial<FixtureMatch>) => {
+    await supabase.from('matches').update(updates).eq('id', matchId);
+    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, ...updates } : m));
+  };
 
-const clearPoolScores = async (poolId: number) => {
-  await supabase.from('matches')
-    .update({ home_goals: null, away_goals: null })
-    .eq('pool_id', poolId);
-  setMatches(prev =>
-    prev.map(m =>
-      m.pool_id === poolId
-        ? { ...m, home_goals: null, away_goals: null }
-        : m
-    )
-  );
-};
+  const updatePoolName = async (poolIndex: number, newName: string) => {
+    const pool = pools[poolIndex];
+    if (!pool) return;
+    await supabase.from('pools').update({ name: newName }).eq('id', pool.id);
+    setPools(prev => prev.map(p => p.id === pool.id ? { ...p, name: newName } : p));
+  };
 
-const updateMatch = async (matchId: number, updates: Partial<FixtureMatch>) => {
-  await supabase.from('matches').update(updates).eq('id', matchId);
-  setMatches(prev => prev.map(m => m.id === matchId ? { ...m, ...updates } : m));
-};
+  const syncPoolsAndTeams = async (newPoolCount: number, newTeamsPerPool: number) => {
+    if (!user) return;
+    // ── 1. Sync pools ──────────────────────────────────────────
+    if (newPoolCount > pools.length) {
+      // Add missing pools + their teams
+      for (let i = pools.length; i < newPoolCount; i++) {
+        // Generate a simple share token
+        const shareToken = Math.random().toString(36).substring(2, 9);
+        const { data: newPool } = await supabase
+          .from('pools')
+          .insert({ user_id: user.id, name: `Pool ${String.fromCharCode(65 + i)}`, share_token: shareToken })
+          .select()
+          .single();
 
-const updatePoolName = async (poolIndex: number, newName: string) => {
-  const pool = pools[poolIndex];
-  if (!pool) return;
-  await supabase.from('pools').update({ name: newName }).eq('id', pool.id);
-  setPools(prev => prev.map(p => p.id === pool.id ? { ...p, name: newName } : p));
-};
+        if (newPool) {
+          setPools(prev => [...prev, newPool]);
 
-const syncPoolsAndTeams = async (newPoolCount: number, newTeamsPerPool: number) => {
-  if (!user) return;
-  // ── 1. Sync pools ──────────────────────────────────────────
-  if (newPoolCount > pools.length) {
-    // Add missing pools + their teams
-    for (let i = pools.length; i < newPoolCount; i++) {
-      // Generate a simple share token
-      const shareToken = Math.random().toString(36).substring(2, 9);
-      const { data: newPool } = await supabase
-        .from('pools')
-        .insert({ user_id: user.id, name: `Pool ${String.fromCharCode(65 + i)}`, share_token: shareToken })
-        .select()
-        .single();
+          const newTeams = Array.from({ length: newTeamsPerPool }, (_, j) => ({
+            user_id: user.id,
+            pool_id: newPool.id,
+            name: `Team ${j + 1}`,
+          }));
+          const { data: insertedTeams } = await supabase
+            .from('teams').insert(newTeams).select();
+          if (insertedTeams) setTeams(prev => [...prev, ...insertedTeams]);
+        }
+      }
+    } else if (newPoolCount < pools.length) {
+      // Remove excess pools and their teams/matches
+      const toRemove = pools.slice(newPoolCount).map(p => p.id);
+      await supabase.from('matches').delete().in('pool_id', toRemove);
+      await supabase.from('teams').delete().in('pool_id', toRemove);
+      await supabase.from('pools').delete().in('id', toRemove);
+      setPools(prev => prev.slice(0, newPoolCount));
+      setTeams(prev => prev.filter(t => !toRemove.includes(t.pool_id)));
+      setMatches(prev => prev.filter(m => !toRemove.includes(m.pool_id)));
+    }
 
-      if (newPool) {
-        setPools(prev => [...prev, newPool]);
+    // ── 2. Sync teams per pool ─────────────────────────────────
+    for (const pool of pools.slice(0, newPoolCount)) {
+      const poolTeams = teams.filter(t => t.pool_id === pool.id);
 
-        const newTeams = Array.from({ length: newTeamsPerPool }, (_, j) => ({
-          user_id: user.id,
-          pool_id: newPool.id,
-          name: `Team ${j + 1}`,
-        }));
+      if (newTeamsPerPool > poolTeams.length) {
+        const newTeams = Array.from(
+          { length: newTeamsPerPool - poolTeams.length },
+          (_, j) => ({
+            user_id: user.id,
+            pool_id: pool.id,
+            name: `Team ${poolTeams.length + j + 1}`,
+          })
+        );
         const { data: insertedTeams } = await supabase
           .from('teams').insert(newTeams).select();
         if (insertedTeams) setTeams(prev => [...prev, ...insertedTeams]);
+
+      } else if (newTeamsPerPool < poolTeams.length) {
+        const toRemove = poolTeams.slice(newTeamsPerPool).map(t => t.id);
+        await supabase.from('teams').delete().in('id', toRemove);
+        setTeams(prev => prev.filter(t => !toRemove.includes(t.id)));
       }
     }
-  } else if (newPoolCount < pools.length) {
-    // Remove excess pools and their teams/matches
-    const toRemove = pools.slice(newPoolCount).map(p => p.id);
-    await supabase.from('matches').delete().in('pool_id', toRemove);
-    await supabase.from('teams').delete().in('pool_id', toRemove);
-    await supabase.from('pools').delete().in('id', toRemove);
-    setPools(prev => prev.slice(0, newPoolCount));
-    setTeams(prev => prev.filter(t => !toRemove.includes(t.pool_id)));
-    setMatches(prev => prev.filter(m => !toRemove.includes(m.pool_id)));
-  }
+  };
 
-  // ── 2. Sync teams per pool ─────────────────────────────────
-  for (const pool of pools.slice(0, newPoolCount)) {
-    const poolTeams = teams.filter(t => t.pool_id === pool.id);
+  const updatePoolCount = async (newCount: number) => {
+    if (!user) return;
+    await supabase.from('settings').upsert({
+      user_id: user.id,
+      pool_count: newCount,              // ✅ snake_case
+      teams_per_pool: settings.teamsPerPool,
+      legs: settings.legs,
+    });
+    await syncPoolsAndTeams(newCount, settings.teamsPerPool);
+    setSettings(prev => ({ ...prev, poolCount: newCount }));
+  };
 
-    if (newTeamsPerPool > poolTeams.length) {
-      const newTeams = Array.from(
-        { length: newTeamsPerPool - poolTeams.length },
-        (_, j) => ({
-          user_id: user.id,
-          pool_id: pool.id,
-          name: `Team ${poolTeams.length + j + 1}`,
-        })
-      );
-      const { data: insertedTeams } = await supabase
-        .from('teams').insert(newTeams).select();
-      if (insertedTeams) setTeams(prev => [...prev, ...insertedTeams]);
-
-    } else if (newTeamsPerPool < poolTeams.length) {
-      const toRemove = poolTeams.slice(newTeamsPerPool).map(t => t.id);
-      await supabase.from('teams').delete().in('id', toRemove);
-      setTeams(prev => prev.filter(t => !toRemove.includes(t.id)));
-    }
-  }
-};
-
-const updatePoolCount = async (newCount: number) => {
-  if (!user) return;
-  await supabase.from('settings').upsert({
-    user_id: user.id,
-    pool_count: newCount,              // ✅ snake_case
-    teams_per_pool: settings.teamsPerPool,
-    legs: settings.legs,
-  });
-  await syncPoolsAndTeams(newCount, settings.teamsPerPool);
-  setSettings(prev => ({ ...prev, poolCount: newCount }));
-};
-
-const updateTeamsPerPool = async (newCount: number) => {
-  if (!user) return;
-  await supabase.from('settings').upsert({
-    user_id: user.id,
-    pool_count: settings.poolCount,
-    teams_per_pool: newCount,          // ✅ snake_case
-    legs: settings.legs,
-  });
-  await syncPoolsAndTeams(settings.poolCount, newCount);
-  setSettings(prev => ({ ...prev, teamsPerPool: newCount }));
-};
-const updateLegs = async (newLegs: number) => {
-  if (!user) return;
-  const { data: existingSettings } = await supabase
-    .from('settings')
-    .select('id')
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  if (existingSettings) {
-    await supabase
+  const updateTeamsPerPool = async (newCount: number) => {
+    if (!user) return;
+    await supabase.from('settings').upsert({
+      user_id: user.id,
+      pool_count: settings.poolCount,
+      teams_per_pool: newCount,          // ✅ snake_case
+      legs: settings.legs,
+    });
+    await syncPoolsAndTeams(settings.poolCount, newCount);
+    setSettings(prev => ({ ...prev, teamsPerPool: newCount }));
+  };
+  const updateLegs = async (newLegs: number) => {
+    if (!user) return;
+    const { data: existingSettings } = await supabase
       .from('settings')
-      .update({ legs: newLegs })
-      .eq('user_id', user.id);
-  } else {
-    await supabase
-      .from('settings')
-      .insert({ user_id: user.id, pool_count: settings.poolCount, teams_per_pool: settings.teamsPerPool, legs: newLegs });
-  }
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle();
 
-  setSettings(prev => ({ ...prev, legs: newLegs }));
-};
-const generateMatches = async (poolId: number, teamIds: number[]) => {
-  if (!user) return;
-  if (teamIds.length < 2) {
-    alert('Need at least 2 teams.');
-    return;
-  }
-
-  const newMatches = [];
-  let matchNumber = 1;
-
-  for (let leg = 0; leg < settings.legs; leg++) {
-    for (let i = 0; i < teamIds.length; i++) {
-      for (let j = i + 1; j < teamIds.length; j++) {
-        // Odd legs flip home/away so teams get both sides
-        const home = leg % 2 === 0 ? teamIds[i] : teamIds[j];
-        const away = leg % 2 === 0 ? teamIds[j] : teamIds[i];
-        newMatches.push({
-          pool_id: poolId,
-          user_id: user.id,
-          match_number: String(matchNumber++),
-          home_team_id: home,
-          away_team_id: away,
-          date: null,
-          home_goals: null,
-          away_goals: null,
-        });
-      }
+    if (existingSettings) {
+      await supabase
+        .from('settings')
+        .update({ legs: newLegs })
+        .eq('user_id', user.id);
+    } else {
+      await supabase
+        .from('settings')
+        .insert({ user_id: user.id, pool_count: settings.poolCount, teams_per_pool: settings.teamsPerPool, legs: newLegs });
     }
-  }
 
-  const { error } = await supabase.from('matches').insert(newMatches);
-  if (error) console.error(error);
-  else {
-    const { data: freshMatches } = await supabase
-      .from('matches').select('*').eq('user_id', user.id).order('match_number');
-    if (freshMatches) setMatches(sortMatchesByNumber(freshMatches));
-  }
-};
+    setSettings(prev => ({ ...prev, legs: newLegs }));
+  };
+  const generateMatches = async (poolId: number, teamIds: number[]) => {
+    if (!user) return;
+    if (teamIds.length < 2) {
+      alert('Need at least 2 teams.');
+      return;
+    }
 
-const generateAllPoolFixtures = async () => {
-  if (!user) return;
-
-  const newMatches = [];
-
-  for (const pool of pools) {
-    const poolTeams = teams.filter(t => t.pool_id === pool.id);
-    const hasFixtures = matches.some(m => m.pool_id === pool.id);
-
-    if (hasFixtures || poolTeams.length < 2) continue;
-
+    const newMatches = [];
     let matchNumber = 1;
-    const teamIds = poolTeams.map(t => t.id);
 
     for (let leg = 0; leg < settings.legs; leg++) {
       for (let i = 0; i < teamIds.length; i++) {
         for (let j = i + 1; j < teamIds.length; j++) {
+          // Odd legs flip home/away so teams get both sides
           const home = leg % 2 === 0 ? teamIds[i] : teamIds[j];
           const away = leg % 2 === 0 ? teamIds[j] : teamIds[i];
-
           newMatches.push({
-            pool_id: pool.id,
+            pool_id: poolId,
             user_id: user.id,
             match_number: String(matchNumber++),
             home_team_id: home,
@@ -371,138 +432,181 @@ const generateAllPoolFixtures = async () => {
         }
       }
     }
-  }
 
-  if (newMatches.length === 0) {
-    alert('No pools are ready for new fixtures.');
-    return;
-  }
+    const { error } = await supabase.from('matches').insert(newMatches);
+    if (error) console.error(error);
+    else {
+      const { data: freshMatches } = await supabase
+        .from('matches').select('*').eq('user_id', user.id).order('match_number');
+      if (freshMatches) setMatches(sortMatchesByNumber(freshMatches));
+    }
+  };
 
-  const { error } = await supabase.from('matches').insert(newMatches);
-  if (error) {
-    console.error(error);
-    return;
-  }
+  const generateAllPoolFixtures = async () => {
+    if (!user) return;
 
-  const { data: freshMatches } = await supabase
-    .from('matches').select('*').eq('user_id', user.id).order('match_number');
-  if (freshMatches) setMatches(sortMatchesByNumber(freshMatches));
-};
+    const newMatches = [];
 
-const poolsReadyForFixtures = pools.filter(pool =>
-  !matches.some(m => m.pool_id === pool.id) &&
-  teams.filter(t => t.pool_id === pool.id).length >= 2
-);
+    for (const pool of pools) {
+      const poolTeams = teams.filter(t => t.pool_id === pool.id);
+      const hasFixtures = matches.some(m => m.pool_id === pool.id);
 
-if (loading) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
-if (!user) return <div style={{ textAlign: 'center', padding: '50px' }}>Please log in to see your fixtures</div>;
+      if (hasFixtures || poolTeams.length < 2) continue;
 
- function renderMatchRow(
-  match: FixtureMatch,
-  poolTeams: FixtureTeam[],
-  poolMatches: FixtureMatch[],
-  legs: number
-) {
-  // How many times has teamA already played teamB (excluding this match)
-  const timesPlayed = (teamAId: number, teamBId: number) =>
-    poolMatches.filter(
-      m =>
-        m.id !== match.id &&
-        ((m.home_team_id === teamAId && m.away_team_id === teamBId) ||
-         (m.home_team_id === teamBId && m.away_team_id === teamAId))
-    ).length;
+      let matchNumber = 1;
+      const teamIds = poolTeams.map(t => t.id);
 
-  // Available away teams: exclude self, exclude teams already at max legs
-  const availableAwayTeams = poolTeams.filter(t => {
-    if (match.home_team_id === null) return true;
-    if (t.id === match.home_team_id) return false;
-    if (t.id === match.away_team_id) return true; // always keep current selection
-    return timesPlayed(match.home_team_id, t.id) < legs;
-  });
+      for (let leg = 0; leg < settings.legs; leg++) {
+        for (let i = 0; i < teamIds.length; i++) {
+          for (let j = i + 1; j < teamIds.length; j++) {
+            const home = leg % 2 === 0 ? teamIds[i] : teamIds[j];
+            const away = leg % 2 === 0 ? teamIds[j] : teamIds[i];
 
-  return (
-    <div
-      key={match.id}
-      className="glass-match-row flex flex-wrap md:flex-nowrap items-center gap-2 p-3 rounded-lg mb-2"
-      data-testid={`row-match-${match.id}`}
-    >
-      {/* Match number */}
-      <div className="w-14 shrink-0">
-        <Input
-          value={match.match_number ?? ''}
-          onChange={e => updateMatch(match.id, { match_number: e.target.value })}
-          placeholder="#"
-          className="h-8 text-center text-xs font-mono"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
-        />
-      </div>
+            newMatches.push({
+              pool_id: pool.id,
+              user_id: user.id,
+              match_number: String(matchNumber++),
+              home_team_id: home,
+              away_team_id: away,
+              date: null,
+              home_goals: null,
+              away_goals: null,
+            });
+          }
+        }
+      }
+    }
 
-      {/* Date */}
-      <div className="w-full md:w-44 shrink-0">
-        <Input
-          type="datetime-local"
-          value={match.date ?? ''}
-          onChange={e => updateMatch(match.id, { date: e.target.value })}
-          className="h-8 text-xs"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
-        />
-      </div>
+    if (newMatches.length === 0) {
+      alert('No pools are ready for new fixtures.');
+      return;
+    }
 
-      {/* Home team */}
-      <div className="flex-1 min-w-[120px]">
-        <Select
-          value={String(match.home_team_id ?? '')}
-          onValueChange={val => updateMatch(match.id, { home_team_id: Number(val) })}
-        >
-          <SelectTrigger className="h-8 text-sm text-white"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {poolTeams.map(t => (
-              <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+    const { error } = await supabase.from('matches').insert(newMatches);
+    if (error) {
+      console.error(error);
+      return;
+    }
 
-      {/* Score */}
-      <div className="flex items-center gap-1 shrink-0">
-        <Input type="number" min="0"
-          value={match.home_goals ?? ''}
-          onChange={e => updateMatch(match.id, { home_goals: e.target.value === '' ? null : Number(e.target.value) })}
-          placeholder="—" className="w-12 h-8 text-center font-bold"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
-        />
-        <span className="text-white/30 text-sm font-bold">:</span>
-        <Input type="number" min="0"
-          value={match.away_goals ?? ''}
-          onChange={e => updateMatch(match.id, { away_goals: e.target.value === '' ? null : Number(e.target.value) })}
-          placeholder="—" className="w-12 h-8 text-center font-bold"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
-        />
-      </div>
+    const { data: freshMatches } = await supabase
+      .from('matches').select('*').eq('user_id', user.id).order('match_number');
+    if (freshMatches) setMatches(sortMatchesByNumber(freshMatches));
+  };
 
-      {/* Away team — filtered to only valid opponents */}
-      <div className="flex-1 min-w-[120px]">
-        <Select
-          value={String(match.away_team_id ?? '')}
-          onValueChange={val => updateMatch(match.id, { away_team_id: Number(val) })}
-        >
-          <SelectTrigger className="h-8 text-sm text-white"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {availableAwayTeams.map(t => (
-              <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-    </div>
+  const poolsReadyForFixtures = pools.filter(pool =>
+    !matches.some(m => m.pool_id === pool.id) &&
+    teams.filter(t => t.pool_id === pool.id).length >= 2
   );
-}
+
+  if (loading) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
+  if (!user) return <div style={{ textAlign: 'center', padding: '50px' }}>Please log in to see your fixtures</div>;
+
+  function renderMatchRow(
+    match: FixtureMatch,
+    poolTeams: FixtureTeam[],
+    poolMatches: FixtureMatch[],
+    legs: number
+  ) {
+    // How many times has teamA already played teamB (excluding this match)
+    const timesPlayed = (teamAId: number, teamBId: number) =>
+      poolMatches.filter(
+        m =>
+          m.id !== match.id &&
+          ((m.home_team_id === teamAId && m.away_team_id === teamBId) ||
+            (m.home_team_id === teamBId && m.away_team_id === teamAId))
+      ).length;
+
+    // Available away teams: exclude self, exclude teams already at max legs
+    const availableAwayTeams = poolTeams.filter(t => {
+      if (match.home_team_id === null) return true;
+      if (t.id === match.home_team_id) return false;
+      if (t.id === match.away_team_id) return true; // always keep current selection
+      return timesPlayed(match.home_team_id, t.id) < legs;
+    });
+
+    return (
+      <div
+        key={match.id}
+        className="glass-match-row flex flex-wrap md:flex-nowrap items-center gap-2 p-3 rounded-lg mb-2"
+        data-testid={`row-match-${match.id}`}
+      >
+        {/* Match number */}
+        <div className="w-14 shrink-0">
+          <Input
+            value={match.match_number ?? ''}
+            onChange={e => updateMatch(match.id, { match_number: e.target.value })}
+            placeholder="#"
+            className="h-8 text-center text-xs font-mono"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+          />
+        </div>
+
+        {/* Date */}
+        <div className="w-full md:w-44 shrink-0">
+          <Input
+            type="datetime-local"
+            value={match.date ?? ''}
+            onChange={e => updateMatch(match.id, { date: e.target.value })}
+            className="h-8 text-xs"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+          />
+        </div>
+
+        {/* Home team */}
+        <div className="flex-1 min-w-[120px]">
+          <Select
+            value={String(match.home_team_id ?? '')}
+            onValueChange={val => updateMatch(match.id, { home_team_id: Number(val) })}
+          >
+            <SelectTrigger className="h-8 text-sm text-white"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {poolTeams.map(t => (
+                <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Score */}
+        <div className="flex items-center gap-1 shrink-0">
+          <Input type="number" min="0"
+            value={match.home_goals ?? ''}
+            onChange={e => updateMatch(match.id, { home_goals: e.target.value === '' ? null : Number(e.target.value) })}
+            placeholder="—" className="w-12 h-8 text-center font-bold"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+          />
+          <span className="text-white/30 text-sm font-bold">:</span>
+          <Input type="number" min="0"
+            value={match.away_goals ?? ''}
+            onChange={e => updateMatch(match.id, { away_goals: e.target.value === '' ? null : Number(e.target.value) })}
+            placeholder="—" className="w-12 h-8 text-center font-bold"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+          />
+        </div>
+
+        {/* Away team — filtered to only valid opponents */}
+        <div className="flex-1 min-w-[120px]">
+          <Select
+            value={String(match.away_team_id ?? '')}
+            onValueChange={val => updateMatch(match.id, { away_team_id: Number(val) })}
+          >
+            <SelectTrigger className="h-8 text-sm text-white"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {availableAwayTeams.map(t => (
+                <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="max-w-5xl mx-auto py-8 px-4 animate-in fade-in duration-300">
       {/* Header */}
@@ -616,108 +720,108 @@ if (!user) return <div style={{ textAlign: 'center', padding: '50px' }}>Please l
       </div>
 
       {pools.map((pool, pi) => {
-  const poolTeams   = teams.filter(t => t.pool_id === pool.id);
-  const poolMatches = sortMatchesByNumber(matches.filter(m => m.pool_id === pool.id));
-  const poolPlayed  = poolMatches.filter(m => m.home_goals !== null && m.away_goals !== null).length;
+        const poolTeams = teams.filter(t => t.pool_id === pool.id);
+        const poolMatches = sortMatchesByNumber(matches.filter(m => m.pool_id === pool.id));
+        const poolPlayed = poolMatches.filter(m => m.home_goals !== null && m.away_goals !== null).length;
 
-  const poolColors = [
-    'rgba(34,197,94',
-    'rgba(59,130,246',
-    'rgba(168,85,247',
-    'rgba(249,115,22',
-  ];
-  const base = poolColors[pi] ?? poolColors[0];
+        const poolColors = [
+          'rgba(34,197,94',
+          'rgba(59,130,246',
+          'rgba(168,85,247',
+          'rgba(249,115,22',
+        ];
+        const base = poolColors[pi] ?? poolColors[0];
 
-  return (
-    <div key={pool.id}>
-      {/* Pool header */}
-      <div
-        className="rounded-t-xl px-5 py-3 flex items-center justify-between gap-3"
-        style={{ background: `${base},0.18)`, borderBottom: `1px solid ${base},0.3)` }}
-      >
-        <input
-          value={pool.name}
-          onChange={e => updatePoolName(pi, e.target.value)}
-          className="font-display text-2xl font-bold text-white tracking-wide bg-transparent border-none outline-none focus:underline decoration-dashed decoration-white/30 underline-offset-4 min-w-0 flex-1"
-          style={{ caretColor: `${base},1)` }}
-          aria-label={`Rename ${pool.name}`}
-          data-testid={`input-pool-name-${pool.id}`}
-        />
+        return (
+          <div key={pool.id}>
+            {/* Pool header */}
+            <div
+              className="rounded-t-xl px-5 py-3 flex items-center justify-between gap-3"
+              style={{ background: `${base},0.18)`, borderBottom: `1px solid ${base},0.3)` }}
+            >
+              <input
+                value={pool.name}
+                onChange={e => updatePoolName(pi, e.target.value)}
+                className="font-display text-2xl font-bold text-white tracking-wide bg-transparent border-none outline-none focus:underline decoration-dashed decoration-white/30 underline-offset-4 min-w-0 flex-1"
+                style={{ caretColor: `${base},1)` }}
+                aria-label={`Rename ${pool.name}`}
+                data-testid={`input-pool-name-${pool.id}`}
+              />
 
-        {/* Played count + pool actions */}
-   <div className="flex items-center gap-2 shrink-0">
-    <span className="text-white/40 text-xs font-mono">
-    {poolPlayed}/{poolMatches.length} played
- </span>
-  {poolMatches.length > 0 && poolPlayed > 0 && (
-  <button
-      onClick={() => clearPoolScores(pool.id)}
-      className="text-xs font-medium px-3 py-1.5 rounded-md border
+              {/* Played count + pool actions */}
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-white/40 text-xs font-mono">
+                  {poolPlayed}/{poolMatches.length} played
+                </span>
+                {poolMatches.length > 0 && poolPlayed > 0 && (
+                  <button
+                    onClick={() => clearPoolScores(pool.id)}
+                    className="text-xs font-medium px-3 py-1.5 rounded-md border
                  text-yellow-400 bg-yellow-500/10 border-yellow-500/30
                  hover:bg-yellow-500/20 transition-colors duration-150"
-    >
-      ↺ Clear Scores
-    </button>
-  )}
-  {poolMatches.length > 0 && (
-    <>
-      <button
-        onClick={() => confirm(`Delete all fixtures for ${pool.name}?`) && deletePoolFixtures(pool.id)}
-        className="text-xs font-medium px-3 py-1.5 rounded-md border
+                  >
+                    ↺ Clear Scores
+                  </button>
+                )}
+                {poolMatches.length > 0 && (
+                  <>
+                    <button
+                      onClick={() => confirm(`Delete all fixtures for ${pool.name}?`) && deletePoolFixtures(pool.id)}
+                      className="text-xs font-medium px-3 py-1.5 rounded-md border
                    text-red-400 bg-red-500/10 border-red-500/30
                    hover:bg-red-500/20 transition-colors duration-150"
-      >
-        🗑 Delete
-      </button>
-      <button
-        onClick={() => {
-          const shareUrl = `${window.location.origin}/view/${pool.share_token}`
-          navigator.clipboard.writeText(shareUrl)
-          alert('Link copied!')
-        }}
-        className="text-xs font-medium px-3 py-1.5 rounded-md border
+                    >
+                      🗑 Delete
+                    </button>
+                    <button
+                      onClick={() => {
+                        const shareUrl = `${window.location.origin}/view/${pool.share_token}`
+                        navigator.clipboard.writeText(shareUrl)
+                        alert('Link copied!')
+                      }}
+                      className="text-xs font-medium px-3 py-1.5 rounded-md border
                    text-blue-400 bg-blue-500/10 border-blue-500/30
                    hover:bg-blue-500/20 transition-colors duration-150"
-      >
-        🔗 Share
-      </button>
-    </>
-  )}
- </div>
-</div>
- 
-      {/* Team names */}
-      <Card className="rounded-none overflow-hidden" style={{ background: 'rgba(0,0,0,0.25)', border: 'none' }}>
-        <CardContent className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {poolTeams.map((team, idx) => (
-            <div key={team.id} className="space-y-1">
-              <Label className="text-xs text-white/35 uppercase tracking-wider">#{idx + 1}</Label>
-              <Input
-                value={team.name}
-                onChange={e => updateTeamName(team.id, e.target.value)}
-                className="font-medium text-white h-8 text-sm"
-                style={{ background: `${base},0.08)`, border: `1px solid ${base},0.2)` }}
-                data-testid={`input-team-${team.id}`}
-              />
+                    >
+                      🔗 Share
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-          ))}
-        </CardContent>
-      </Card>
 
-      {/* Fixtures */}
-      <div
-        className="rounded-b-xl p-4"
-        style={{ background: 'rgba(0,0,0,0.18)', border: `1px solid rgba(255,255,255,0.06)`, borderTop: 'none' }}
-      >
-        <div className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">Fixtures</div>
-           {poolMatches.map(m => renderMatchRow(m, poolTeams, poolMatches, settings.legs))}
-        {poolMatches.length === 0 && (
-          <p className="text-white/25 text-sm text-center py-4">No matches — add at least 2 teams.</p>
-        )}
-      </div>
-    </div>
-  );
-})}
+            {/* Team names */}
+            <Card className="rounded-none overflow-hidden" style={{ background: 'rgba(0,0,0,0.25)', border: 'none' }}>
+              <CardContent className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {poolTeams.map((team, idx) => (
+                  <div key={team.id} className="space-y-1">
+                    <Label className="text-xs text-white/35 uppercase tracking-wider">#{idx + 1}</Label>
+                    <Input
+                      value={team.name}
+                      onChange={e => updateTeamName(team.id, e.target.value)}
+                      className="font-medium text-white h-8 text-sm"
+                      style={{ background: `${base},0.08)`, border: `1px solid ${base},0.2)` }}
+                      data-testid={`input-team-${team.id}`}
+                    />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* Fixtures */}
+            <div
+              className="rounded-b-xl p-4"
+              style={{ background: 'rgba(0,0,0,0.18)', border: `1px solid rgba(255,255,255,0.06)`, borderTop: 'none' }}
+            >
+              <div className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">Fixtures</div>
+              {poolMatches.map(m => renderMatchRow(m, poolTeams, poolMatches, settings.legs))}
+              {poolMatches.length === 0 && (
+                <p className="text-white/25 text-sm text-center py-4">No matches — add at least 2 teams.</p>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
