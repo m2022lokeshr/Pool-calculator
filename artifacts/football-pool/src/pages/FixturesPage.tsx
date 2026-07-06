@@ -93,118 +93,6 @@ function NumericInput({
   );
 }
 
-// ── Debounced input components ──────────────────────────────────────────────
-// These hold local state for instant typing feedback and only write to Supabase
-// after the user stops typing for 600 ms, eliminating per-keystroke DB calls.
-
-function TeamNameInput({ team, base, onUpdate }: {
-  team: FixtureTeam;
-  base: string;
-  onUpdate: (id: number, name: string) => void;
-}) {
-  const [localName, setLocalName] = useState(team.name);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
-  useEffect(() => { setLocalName(team.name); }, [team.name]);
-  function handleChange(e: { target: { value: string } }) {
-    const val = e.target.value;
-    setLocalName(val);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => onUpdate(team.id, val), 600);
-  }
-  return (
-    <Input
-      value={localName}
-      onChange={handleChange}
-      className="font-medium text-white h-8 text-sm"
-      style={{ background: `${base},0.08)`, border: `1px solid ${base},0.2)` }}
-      data-testid={`input-team-${team.id}`}
-    />
-  );
-}
-
-function PoolNameInput({ pool, pi, base, onUpdate }: {
-  pool: FixturePool;
-  pi: number;
-  base: string;
-  onUpdate: (pi: number, name: string) => void;
-}) {
-  const [localName, setLocalName] = useState(pool.name);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
-  useEffect(() => { setLocalName(pool.name); }, [pool.name]);
-  function handleChange(e: { target: { value: string } }) {
-    const val = e.target.value;
-    setLocalName(val);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => onUpdate(pi, val), 600);
-  }
-  return (
-    <input
-      value={localName}
-      onChange={handleChange}
-      className="font-display text-2xl font-bold text-white tracking-wide bg-transparent border-none outline-none focus:underline decoration-dashed decoration-white/30 underline-offset-4 min-w-0 flex-1"
-      style={{ caretColor: `${base},1)` }}
-      aria-label={`Rename ${pool.name}`}
-      data-testid={`input-pool-name-${pool.id}`}
-    />
-  );
-}
-
-function ScoreInput({ matchId, field, value, onUpdate }: {
-  matchId: number;
-  field: 'home_goals' | 'away_goals';
-  value: number | null;
-  onUpdate: (id: number, updates: Partial<FixtureMatch>) => void;
-}) {
-  const [local, setLocal] = useState(value === null ? '' : String(value));
-  const timer = useRef<ReturnType<typeof setTimeout>>();
-  useEffect(() => { setLocal(value === null ? '' : String(value)); }, [value]);
-  function handleChange(e: { target: { value: string } }) {
-    const raw = e.target.value;
-    setLocal(raw);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      onUpdate(matchId, { [field]: raw === '' ? null : Number(raw) });
-    }, 600);
-  }
-  return (
-    <Input
-      type="number"
-      min="0"
-      value={local}
-      onChange={handleChange}
-      placeholder="—"
-      className="w-12 h-8 text-center font-bold"
-      style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
-    />
-  );
-}
-
-function MatchNumberInput({ match, onUpdate }: {
-  match: FixtureMatch;
-  onUpdate: (id: number, updates: Partial<FixtureMatch>) => void;
-}) {
-  const [local, setLocal] = useState(String(match.match_number ?? ''));
-  const timer = useRef<ReturnType<typeof setTimeout>>();
-  useEffect(() => { setLocal(String(match.match_number ?? '')); }, [match.match_number]);
-  function handleChange(e: { target: { value: string } }) {
-    const val = e.target.value;
-    setLocal(val);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      onUpdate(match.id, { match_number: val });
-    }, 600);
-  }
-  return (
-    <Input
-      value={local}
-      onChange={handleChange}
-      placeholder="#"
-      className="h-8 text-center text-xs font-mono"
-      style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
-    />
-  );
-}
-
 export default function FixturesPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -222,6 +110,11 @@ export default function FixturesPage() {
   const [matches, setMatches] = useState<FixtureMatch[]>([]);
   const [settings, setSettings] = useState<FixtureSettings>({ poolCount: 2, teamsPerPool: 4, legs: 1 });
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Per-entity debounce timers — one slot per team/pool/match-field
+  const teamTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const poolTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const matchTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // ✅ Derived values
   const totalMatches = matches.length;
@@ -260,9 +153,12 @@ export default function FixturesPage() {
   }, [user]);
 
   // --- update functions ---
-  const updateTeamName = async (teamId: number, newName: string) => {
-    await supabase.from('teams').update({ name: newName }).eq('id', teamId);
+  const updateTeamName = (teamId: number, newName: string) => {
     setTeams(prev => prev.map(t => t.id === teamId ? { ...t, name: newName } : t));
+    clearTimeout(teamTimers.current.get(teamId));
+    teamTimers.current.set(teamId, setTimeout(async () => {
+      await supabase.from('teams').update({ name: newName }).eq('id', teamId);
+    }, 600));
   };
 
   // ✅ Add these right here
@@ -284,16 +180,23 @@ export default function FixturesPage() {
     );
   };
 
-  const updateMatch = async (matchId: number, updates: Partial<FixtureMatch>) => {
-    await supabase.from('matches').update(updates).eq('id', matchId);
+  const updateMatch = (matchId: number, updates: Partial<FixtureMatch>) => {
     setMatches(prev => prev.map(m => m.id === matchId ? { ...m, ...updates } : m));
+    const key = `${matchId}-${Object.keys(updates).join(',')}`;
+    clearTimeout(matchTimers.current.get(key));
+    matchTimers.current.set(key, setTimeout(async () => {
+      await supabase.from('matches').update(updates).eq('id', matchId);
+    }, 600));
   };
 
-  const updatePoolName = async (poolIndex: number, newName: string) => {
+  const updatePoolName = (poolIndex: number, newName: string) => {
     const pool = pools[poolIndex];
     if (!pool) return;
-    await supabase.from('pools').update({ name: newName }).eq('id', pool.id);
     setPools(prev => prev.map(p => p.id === pool.id ? { ...p, name: newName } : p));
+    clearTimeout(poolTimers.current.get(pool.id));
+    poolTimers.current.set(pool.id, setTimeout(async () => {
+      await supabase.from('pools').update({ name: newName }).eq('id', pool.id);
+    }, 600));
   };
 
   const syncPoolsAndTeams = async (newPoolCount: number, newTeamsPerPool: number) => {
