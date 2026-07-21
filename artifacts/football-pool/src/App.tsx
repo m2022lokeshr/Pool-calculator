@@ -15,11 +15,6 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 import { useAuthReady } from '@/hooks/useAuthReady'
 import { toast } from "@/hooks/use-toast"
 import ViewPage from './pages/ViewPage'
-declare global {
-  interface Window {
-    adsbygoogle?: { push: (params: unknown) => void } | any[];
-  }
-}
 
 const queryClient = new QueryClient();
 
@@ -252,18 +247,6 @@ function Router() {
 
 function App() {
    const ready = useAuthReady()
-   const [location] = useLocation(); // Gets the current page URL
-// 👇 ADD THIS useEffect 👇
-useEffect(() => {
-  try {
-    const ads = document.querySelectorAll('ins.adsbygoogle')
-    ads.forEach(ad => {
-      if (!ad.getAttribute('data-adsbygoogle-status')) {
-        (window.adsbygoogle = window.adsbygoogle || []).push({})
-      }
-    })
-  } catch (e) { console.error('Ad push error:', e) }
-}, [location]) // Runs this effect whenever the location changes
 if (!ready) return null 
   return (
     <QueryClientProvider client={queryClient}>

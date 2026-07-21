@@ -1,16 +1,5 @@
 import { usePoolState } from '@/hooks/usePoolState';
-import { Standing, Match, Team, Pool, getRoundLabel, getMatchLabel, generatePoolSeeding } from '@/lib/poolLogic';
-
-function matchNumberValue(match: Match): number {
-  const value = Number(match.matchNumber);
-  return Number.isFinite(value) ? value : Number.MAX_SAFE_INTEGER;
-}
-
-function sortMatchesByNumber(matches: Match[]): Match[] {
-  return [...matches].sort((a, b) =>
-    matchNumberValue(a) - matchNumberValue(b) || a.id.localeCompare(b.id)
-  );
-}
+import { Standing, Match, Team, Pool, getRoundLabel, getMatchLabel, generatePoolSeeding, sortMatchesByNumber } from '@/lib/poolLogic';
 
 function fmt(dateStr: string): string {
   if (!dateStr) return '—';

@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { supabase } from '../supabaseClient';
-import type { User } from '@supabase/supabase-js';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -94,7 +93,7 @@ function NumericInput({
 }
 
 export default function FixturesPage() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<import('@supabase/supabase-js').User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -180,14 +179,14 @@ export default function FixturesPage() {
     );
   };
 
-  const updateMatch = (matchId: number, updates: Partial<FixtureMatch>) => {
+  const updateMatch = useCallback((matchId: number, updates: Partial<FixtureMatch>) => {
     setMatches(prev => prev.map(m => m.id === matchId ? { ...m, ...updates } : m));
     const key = `${matchId}-${Object.keys(updates).join(',')}`;
     clearTimeout(matchTimers.current.get(key));
     matchTimers.current.set(key, setTimeout(async () => {
       await supabase.from('matches').update(updates).eq('id', matchId);
     }, 600));
-  };
+  }, []);
 
   const updatePoolName = (poolIndex: number, newName: string) => {
     const pool = pools[poolIndex];
@@ -404,13 +403,19 @@ export default function FixturesPage() {
   if (loading) return <div style={{ textAlign: 'center', padding: '50px' }}>Loading...</div>;
   if (!user) return <div style={{ textAlign: 'center', padding: '50px' }}>Please log in to see your fixtures</div>;
 
-  function renderMatchRow(
-    match: FixtureMatch,
-    poolTeams: FixtureTeam[],
-    poolMatches: FixtureMatch[],
-    legs: number
-  ) {
-    // How many times has teamA already played teamB (excluding this match)
+  const MatchRow = memo(function MatchRow({
+    match,
+    poolTeams,
+    poolMatches,
+    legs,
+    onUpdate,
+  }: {
+    match: FixtureMatch;
+    poolTeams: FixtureTeam[];
+    poolMatches: FixtureMatch[];
+    legs: number;
+    onUpdate: (matchId: number, updates: Partial<FixtureMatch>) => void;
+  }) {
     const timesPlayed = (teamAId: number, teamBId: number) =>
       poolMatches.filter(
         m =>
@@ -419,47 +424,39 @@ export default function FixturesPage() {
             (m.home_team_id === teamBId && m.away_team_id === teamAId))
       ).length;
 
-    // Available away teams: exclude self, exclude teams already at max legs
     const availableAwayTeams = poolTeams.filter(t => {
       if (match.home_team_id === null) return true;
       if (t.id === match.home_team_id) return false;
-      if (t.id === match.away_team_id) return true; // always keep current selection
+      if (t.id === match.away_team_id) return true;
       return timesPlayed(match.home_team_id, t.id) < legs;
     });
 
     return (
       <div
-        key={match.id}
         className="glass-match-row flex flex-wrap md:flex-nowrap items-center gap-2 p-3 rounded-lg mb-2"
-        data-testid={`row-match-${match.id}`}
       >
-        {/* Match number */}
         <div className="w-14 shrink-0">
           <Input
             value={match.match_number ?? ''}
-            onChange={e => updateMatch(match.id, { match_number: e.target.value })}
+            onChange={e => onUpdate(match.id, { match_number: e.target.value })}
             placeholder="#"
             className="h-8 text-center text-xs font-mono"
             style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
           />
         </div>
-
-        {/* Date */}
         <div className="w-full md:w-44 shrink-0">
           <Input
             type="datetime-local"
             value={match.date ?? ''}
-            onChange={e => updateMatch(match.id, { date: e.target.value })}
+            onChange={e => onUpdate(match.id, { date: e.target.value })}
             className="h-8 text-xs"
             style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
           />
         </div>
-
-        {/* Home team */}
         <div className="flex-1 min-w-[120px]">
           <Select
             value={String(match.home_team_id ?? '')}
-            onValueChange={val => updateMatch(match.id, { home_team_id: Number(val) })}
+            onValueChange={val => onUpdate(match.id, { home_team_id: Number(val) })}
           >
             <SelectTrigger className="h-8 text-sm text-white"
               style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -472,29 +469,25 @@ export default function FixturesPage() {
             </SelectContent>
           </Select>
         </div>
-
-        {/* Score */}
         <div className="flex items-center gap-1 shrink-0">
           <Input type="number" min="0"
             value={match.home_goals ?? ''}
-            onChange={e => updateMatch(match.id, { home_goals: e.target.value === '' ? null : Number(e.target.value) })}
+            onChange={e => onUpdate(match.id, { home_goals: e.target.value === '' ? null : Number(e.target.value) })}
             placeholder="—" className="w-12 h-8 text-center font-bold"
             style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
           />
           <span className="text-white/30 text-sm font-bold">:</span>
           <Input type="number" min="0"
             value={match.away_goals ?? ''}
-            onChange={e => updateMatch(match.id, { away_goals: e.target.value === '' ? null : Number(e.target.value) })}
+            onChange={e => onUpdate(match.id, { away_goals: e.target.value === '' ? null : Number(e.target.value) })}
             placeholder="—" className="w-12 h-8 text-center font-bold"
             style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
           />
         </div>
-
-        {/* Away team — filtered to only valid opponents */}
         <div className="flex-1 min-w-[120px]">
           <Select
             value={String(match.away_team_id ?? '')}
-            onValueChange={val => updateMatch(match.id, { away_team_id: Number(val) })}
+            onValueChange={val => onUpdate(match.id, { away_team_id: Number(val) })}
           >
             <SelectTrigger className="h-8 text-sm text-white"
               style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -509,7 +502,7 @@ export default function FixturesPage() {
         </div>
       </div>
     );
-  }
+  });
   return (
     <div className="max-w-5xl mx-auto py-8 px-4 animate-in fade-in duration-300">
       {/* Header */}
@@ -717,7 +710,9 @@ export default function FixturesPage() {
               style={{ background: 'rgba(0,0,0,0.18)', border: `1px solid rgba(255,255,255,0.06)`, borderTop: 'none' }}
             >
               <div className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">Fixtures</div>
-              {poolMatches.map(m => renderMatchRow(m, poolTeams, poolMatches, settings.legs))}
+              {poolMatches.map(m => (
+                <MatchRow key={m.id} match={m} poolTeams={poolTeams} poolMatches={poolMatches} legs={settings.legs} onUpdate={updateMatch} />
+              ))}
               {poolMatches.length === 0 && (
                 <p className="text-white/25 text-sm text-center py-4">No matches — add at least 2 teams.</p>
               )}

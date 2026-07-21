@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import {
   Team, Match, Standing, Pool, LeagueSettings, QualifierCount, KnockoutMatch, ResolvedKOMatch,
-  calculateStandings, generateKnockoutStructure, resolveKnockout,
+  calculateStandings, generateKnockoutStructure, resolveKnockout, sortMatchesByNumber,
 } from '@/lib/poolLogic';
 
 const DEFAULT_SETTINGS: LeagueSettings = { poolCount: 2, teamsPerPool: 4, legs: 1 };
@@ -91,17 +91,6 @@ function mapMatch(row: DbMatch): Match {
     leg: row.leg ?? 1,
     poolId: toId(row.pool_id),
   };
-}
-
-function matchNumberValue(match: Match): number {
-  const value = Number(match.matchNumber);
-  return Number.isFinite(value) ? value : Number.MAX_SAFE_INTEGER;
-}
-
-function sortMatchesByNumber(matches: Match[]): Match[] {
-  return [...matches].sort((a, b) =>
-    matchNumberValue(a) - matchNumberValue(b) || a.id.localeCompare(b.id)
-  );
 }
 
 function mapKoMatch(row: DbKoMatch): KnockoutMatch {
@@ -228,18 +217,25 @@ export function usePoolState() {
 
   useEffect(() => {
     if (!userId) return;
+    let debounceTimer: ReturnType<typeof setTimeout>;
+
+    const debouncedRefresh = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => refresh(userId), 100);
+    };
 
     const channelName = `pool-state-${userId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const channel = supabase
       .channel(channelName)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pools', filter: `user_id=eq.${userId}` }, () => refresh(userId))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'teams', filter: `user_id=eq.${userId}` }, () => refresh(userId))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches', filter: `user_id=eq.${userId}` }, () => refresh(userId))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: `user_id=eq.${userId}` }, () => refresh(userId))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'knockout_matches', filter: `user_id=eq.${userId}` }, () => refresh(userId))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pools', filter: `user_id=eq.${userId}` }, debouncedRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'teams', filter: `user_id=eq.${userId}` }, debouncedRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches', filter: `user_id=eq.${userId}` }, debouncedRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: `user_id=eq.${userId}` }, debouncedRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'knockout_matches', filter: `user_id=eq.${userId}` }, debouncedRefresh)
       .subscribe();
 
     return () => {
+      clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, [refresh, userId]);

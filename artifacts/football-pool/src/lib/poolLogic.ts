@@ -70,6 +70,17 @@ export interface ResolvedKOMatch {
   winner: Standing | null;
 }
 
+export function matchNumberValue(match: Match): number {
+  const value = Number(match.matchNumber);
+  return Number.isFinite(value) ? value : Number.MAX_SAFE_INTEGER;
+}
+
+export function sortMatchesByNumber(matches: Match[]): Match[] {
+  return [...matches].sort((a, b) =>
+    matchNumberValue(a) - matchNumberValue(b) || a.id.localeCompare(b.id)
+  );
+}
+
 // ─── Pool helpers ────────────────────────────────────────────────────────────
 
 export function getPools(poolCount: number, customNames?: string[]): Pool[] {

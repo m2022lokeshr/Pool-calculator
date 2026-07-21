@@ -1,3 +1,4 @@
+import { memo, useCallback } from 'react';
 import { usePoolState } from '@/hooks/usePoolState';
 import { QualifierCount, ResolvedKOMatch, getRoundLabel, getMatchLabel, generatePoolSeeding } from '@/lib/poolLogic';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -17,7 +18,7 @@ const POOL_COLORS = [
   'rgba(249,115,22',
 ];
 
-function KoMatchCard({
+const KoMatchCard = memo(function KoMatchCard({
   match,
   label,
   isFinal,
@@ -92,7 +93,7 @@ function KoMatchCard({
       </div>
     </div>
   );
-}
+});
 
 export default function KnockoutPage() {
   const { qualifiers, resolvedBracket, pools, poolStandings, matches, updateKoMatch, updateQualifiers, settings } = usePoolState();
@@ -114,9 +115,9 @@ export default function KnockoutPage() {
   const finalMatch = resolvedBracket.find(m => m.round === 1);
   const champion = finalMatch?.winner ?? null;
 
-  function handleUpdate(id: string, homeGoals: number | null, awayGoals: number | null) {
+  const handleUpdate = useCallback((id: string, homeGoals: number | null, awayGoals: number | null) => {
     updateKoMatch(id, { homeGoals, awayGoals });
-  }
+  }, [updateKoMatch]);
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 animate-in fade-in duration-300">
