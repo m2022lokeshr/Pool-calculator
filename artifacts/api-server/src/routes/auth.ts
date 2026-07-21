@@ -16,6 +16,7 @@ import {
   SESSION_COOKIE,
   SESSION_TTL,
   ISSUER_URL,
+  getReplId,
   type SessionData,
 } from "../lib/auth";
 
@@ -191,7 +192,7 @@ router.get("/logout", async (req: Request, res: Response) => {
   await clearSession(res, sid);
 
   const endSessionUrl = oidc.buildEndSessionUrl(config, {
-    client_id: process.env.REPL_ID!,
+    client_id: getReplId(),
     post_logout_redirect_uri: origin,
   });
 

@@ -18,11 +18,17 @@ export interface SessionData {
 
 let oidcConfig: client.Configuration | null = null;
 
+export function getReplId(): string {
+  const id = process.env.REPL_ID;
+  if (!id) throw new Error("REPL_ID environment variable is required for OIDC discovery");
+  return id;
+}
+
 export async function getOidcConfig(): Promise<client.Configuration> {
   if (!oidcConfig) {
     oidcConfig = await client.discovery(
       new URL(ISSUER_URL),
-      process.env.REPL_ID!,
+      getReplId(),
     );
   }
   return oidcConfig;
@@ -74,7 +80,7 @@ export async function clearSession(
   sid?: string,
 ): Promise<void> {
   if (sid) await deleteSession(sid);
-  res.clearCookie(SESSION_COOKIE, { path: "/" });
+  res.clearCookie(SESSION_COOKIE, { path: "/", sameSite: "lax", secure: true });
 }
 
 export function getSessionId(req: Request): string | undefined {

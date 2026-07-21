@@ -10,35 +10,20 @@ export default function ViewPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-  console.log('token from URL:', token)
-  if (!token) return
-  const load = async () => {
-    const { data, error } = await supabase
-      .from('pools').select('*').eq('share_token', token).single()
-    console.log('result:', data, 'error:', error)
-    // ... rest
-  }
-  load()
-}, [token])
-  useEffect(() => {
     if (!token) return
     const load = async () => {
       const { data: poolData } = await supabase
         .from('pools').select('*').eq('share_token', token).single()
       if (!poolData) { setLoading(false); return }
       setPool(poolData)
-      const { data: teamsData, error: teamsError } = await supabase
+      const { data: teamsData } = await supabase
         .from('teams').select('*').eq('pool_id', poolData.id).order('id')
-      console.log('Teams data:', teamsData, 'Teams error:', teamsError)
       if (teamsData) {
-        teamsData.forEach(t => console.log(`Team: id=${t.id}, name=${t.name}`))
         setTeams(teamsData)
       }
-      const { data: matchesData, error: matchesError } = await supabase
+      const { data: matchesData } = await supabase
         .from('matches').select('*').eq('pool_id', poolData.id).order('match_number')
-      console.log('Matches data:', matchesData, 'Matches error:', matchesError)
       if (matchesData) {
-        matchesData.forEach(m => console.log(`Match: id=${m.id}, home_team_id=${m.home_team_id}, away_team_id=${m.away_team_id}`))
         setMatches(matchesData)
       }
       setLoading(false)

@@ -49,6 +49,10 @@ export interface KnockoutMatch {
   slot: number;   // 0-indexed within round
   homeGoals: number | null;
   awayGoals: number | null;
+  extraTimeHomeGoals?: number | null;
+  extraTimeAwayGoals?: number | null;
+  penaltiesHomeGoals?: number | null;
+  penaltiesAwayGoals?: number | null;
 }
 
 export interface ResolvedKOMatch {
@@ -59,6 +63,10 @@ export interface ResolvedKOMatch {
   awayTeam: Standing | null;
   homeGoals: number | null;
   awayGoals: number | null;
+  extraTimeHomeGoals: number | null;
+  extraTimeAwayGoals: number | null;
+  penaltiesHomeGoals: number | null;
+  penaltiesAwayGoals: number | null;
   winner: Standing | null;
 }
 
@@ -244,12 +252,28 @@ export function resolveKnockout(
       if (raw.homeGoals !== null && raw.awayGoals !== null && homeTeam && awayTeam) {
         if (raw.homeGoals > raw.awayGoals) winner = homeTeam;
         else if (raw.awayGoals > raw.homeGoals) winner = awayTeam;
+        else {
+          const etHome = raw.extraTimeHomeGoals ?? 0;
+          const etAway = raw.extraTimeAwayGoals ?? 0;
+          if (etHome > etAway) winner = homeTeam;
+          else if (etAway > etHome) winner = awayTeam;
+          else {
+            const pHome = raw.penaltiesHomeGoals ?? 0;
+            const pAway = raw.penaltiesAwayGoals ?? 0;
+            if (pHome > pAway) winner = homeTeam;
+            else if (pAway > pHome) winner = awayTeam;
+          }
+        }
       }
 
       resolved.set(key, {
         id: raw.id, round: r, slot: s,
         homeTeam, awayTeam,
         homeGoals: raw.homeGoals, awayGoals: raw.awayGoals,
+        extraTimeHomeGoals: raw.extraTimeHomeGoals ?? null,
+        extraTimeAwayGoals: raw.extraTimeAwayGoals ?? null,
+        penaltiesHomeGoals: raw.penaltiesHomeGoals ?? null,
+        penaltiesAwayGoals: raw.penaltiesAwayGoals ?? null,
         winner,
       });
     }

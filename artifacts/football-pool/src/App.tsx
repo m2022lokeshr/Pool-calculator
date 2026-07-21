@@ -10,8 +10,10 @@ import PrintExport from "@/components/PrintExport";
 import { useState, useEffect } from "react";
 import { supabase } from './supabaseClient'
 import type { User } from '@supabase/supabase-js';
+import { motion } from "framer-motion";
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { useAuthReady } from '@/hooks/useAuthReady'
+import { toast } from "@/hooks/use-toast"
 import ViewPage from './pages/ViewPage'
 declare global {
   interface Window {
@@ -87,14 +89,14 @@ function AuthButton() {
               email,
               password,
             });
-            if (error) alert(error.message);
-            else alert('Account created! Now switch to Log In.');
+            if (error) toast({ variant: "destructive", title: "Sign up failed", description: error.message });
+            else toast({ title: "Account created!", description: "Now switch to Log In." });
           } else {
             const { error } = await supabase.auth.signInWithPassword({
               email,
               password,
             });
-            if (error) alert(error.message);
+            if (error) toast({ variant: "destructive", title: "Login failed", description: error.message });
           }
         }}
         className="shrink-0 text-xs font-semibold text-white bg-primary hover:bg-primary/90 rounded-md px-3 py-1.5 transition-colors shadow shadow-primary/30"
@@ -118,8 +120,6 @@ function AuthButton() {
     </div>
   );
 }
-import { motion } from "framer-motion";
-
 function LandingPage() {
   const [, navigate] = useLocation();
 
@@ -262,7 +262,7 @@ useEffect(() => {
         (window.adsbygoogle = window.adsbygoogle || []).push({})
       }
     })
-  } catch (e) {}
+  } catch (e) { console.error('Ad push error:', e) }
 }, [location]) // Runs this effect whenever the location changes
 if (!ready) return null 
   return (

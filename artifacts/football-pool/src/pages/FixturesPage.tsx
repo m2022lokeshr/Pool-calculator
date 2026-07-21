@@ -141,11 +141,11 @@ export default function FixturesPage() {
       const { data: settingsData } = await supabase
         .from('settings').select('*').eq('user_id', user.id).maybeSingle();
       if (settingsData) {
-        setSettings({
-          poolCount: settingsData.pool_count ?? settings.poolCount,
-          teamsPerPool: settingsData.teams_per_pool ?? settings.teamsPerPool,
-          legs: settingsData.legs ?? settings.legs,
-        });
+        setSettings(prev => ({
+          poolCount: settingsData.pool_count ?? prev.poolCount,
+          teamsPerPool: settingsData.teams_per_pool ?? prev.teamsPerPool,
+          legs: settingsData.legs ?? prev.legs,
+        }));
       }
     };
 
@@ -206,7 +206,7 @@ export default function FixturesPage() {
       // Add missing pools + their teams
       for (let i = pools.length; i < newPoolCount; i++) {
         // Generate a simple share token
-        const shareToken = Math.random().toString(36).substring(2, 9);
+        const shareToken = crypto.randomUUID();
         const { data: newPool } = await supabase
           .from('pools')
           .insert({ user_id: user.id, name: `Pool ${String.fromCharCode(65 + i)}`, share_token: shareToken })
