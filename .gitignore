@@ -55,3 +55,8 @@ Thumbs.db
 AUDIT.md
 FEATURE_PROPOSALS.md
 .agents/AGENTS.md
+/.agents/skills/find-skills
+.serena/memories/memory_maintenance.md
+.serena/project.yml
+AGENTS.md
+skills-lock.json
