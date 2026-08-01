@@ -25,7 +25,6 @@ const NAV_TABS = [
 ];
 
 function AuthButton() {
-  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,48 +33,33 @@ function AuthButton() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
       setIsLoading(false);
+      if (session?.user) navigate('/fixtures');
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      if (session?.user) navigate('/fixtures');
     });
 
     return () => listener?.subscription.unsubscribe();
   }, []);
   if (isLoading) return null;
 
-  if (user) {
-    return (
-      <button
-        onClick={async () => {
-          await supabase.auth.signOut();
-          navigate('/');
-        }}
-        className="shrink-0 text-xs font-semibold text-white/70 hover:text-white border border-white/20 hover:border-white/40 rounded-md px-3 py-1.5 transition-colors"
-        data-testid="btn-logout"
-      >
-        {user.email ? `Sign out (${user.email})` : "Sign out"}
-      </button>
-    );
-  }
-
   return (
-    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+    <div className="flex w-full flex-col gap-3">
       <input
         type="email"
         placeholder="Email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #ccc', width: '120px' }}
+        className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2.5 text-sm text-white placeholder:text-white/35 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30"
       />
       <input
         type="password"
         placeholder="Password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #ccc', width: '100px' }}
+        className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2.5 text-sm text-white placeholder:text-white/35 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30"
       />
       <button
         onClick={async () => {
@@ -92,32 +76,62 @@ function AuthButton() {
               password,
             });
             if (error) toast({ variant: "destructive", title: "Login failed", description: error.message });
+            else navigate('/fixtures');
           }
         }}
-        className="shrink-0 text-xs font-semibold text-white bg-primary hover:bg-primary/90 rounded-md px-3 py-1.5 transition-colors shadow shadow-primary/30"
+        className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-primary/30 transition hover:bg-primary/90"
         data-testid="btn-login"
       >
         {isSignUp ? 'Sign Up' : 'Log In'}
       </button>
       <button
         onClick={() => setIsSignUp(!isSignUp)}
-        style={{
-          fontSize: '12px',
-          color: '#666',
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          textDecoration: 'underline'
-        }}
+        className="self-center text-xs text-white/55 underline-offset-4 transition hover:text-white hover:underline"
       >
         {isSignUp ? 'Switch to Log In' : 'Switch to Sign Up'}
       </button>
     </div>
   );
 }
-function LandingPage() {
+
+function AccountActions() {
+  const [user, setUser] = useState<User | null>(null);
   const [, navigate] = useLocation();
 
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => listener?.subscription.unsubscribe();
+  }, []);
+
+  if (!user) return null;
+
+  return (
+    <div className="flex shrink-0 items-center gap-3">
+      <span className="hidden max-w-40 truncate text-xs text-white/55 sm:block" title={user.email ?? undefined}>
+        {user.email}
+      </span>
+      <button
+        onClick={async () => {
+          await supabase.auth.signOut();
+          navigate('/');
+        }}
+        className="rounded-md border border-white/20 px-3 py-1.5 text-xs font-semibold text-white/70 transition-colors hover:border-white/40 hover:text-white"
+        data-testid="btn-logout"
+      >
+        Sign out
+      </button>
+    </div>
+  );
+}
+
+function LandingPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center text-center px-4 relative overflow-hidden">
 
@@ -156,20 +170,21 @@ function LandingPage() {
         Football Tournament Manager
       </motion.p>
 
-      {/* CTA Button */}
-      <motion.button
+      {/* Authenticate before entering the tournament workspace. */}
+      <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.97 }}
-        onClick={() => navigate("/fixtures")}
-        className="relative px-10 py-4 bg-primary text-white font-bold rounded-2xl text-base tracking-wide shadow-[0_0_30px_rgba(34,197,94,0.5)] hover:shadow-[0_0_50px_rgba(34,197,94,0.7)] transition-shadow"
+        transition={{ delay: 0.45 }}
+        className="mb-6 w-full max-w-sm rounded-2xl border border-white/10 bg-black/25 p-5 text-left shadow-2xl shadow-black/20 backdrop-blur-sm"
       >
-        🏟️ Start Tournament
-        {/* Button inner glow */}
-        <span className="absolute inset-0 rounded-2xl bg-white/10 opacity-0 hover:opacity-100 transition-opacity" />
-      </motion.button>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-primary/80">
+          Your tournament space
+        </p>
+        <p className="mb-5 text-sm text-white/60">
+          Sign in to save your tournament
+        </p>
+        <AuthButton />
+      </motion.div>
 
       {/* Bottom hint */}
       <motion.p
@@ -224,8 +239,7 @@ function Navigation() {
           })}
         </nav>
 
-        {/* Auth */}
-        <AuthButton />
+        <AccountActions />
       </div>
     </header>
   );
