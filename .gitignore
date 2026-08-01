@@ -60,3 +60,7 @@ FEATURE_PROPOSALS.md
 .serena/project.yml
 AGENTS.md
 skills-lock.json
+graphify-out/.graphify_root
+graphify-out/GRAPH_REPORT.md
+graphify-out/cost.json
+graphify-out
