@@ -28,6 +28,7 @@ type FixtureMatch = {
   pool_id: number;
   match_number: string | number | null;
   date: string | null;
+  kickoff_at: string | null;
   home_team_id: number | null;
   away_team_id: number | null;
   home_goals: number | null;
@@ -43,6 +44,14 @@ function sortMatchesByNumber(matches: FixtureMatch[]): FixtureMatch[] {
   return [...matches].sort((a, b) =>
     matchNumberValue(a) - matchNumberValue(b) || a.id - b.id
   );
+}
+
+function toLocalDateTimeInputValue(value: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function NumericInput({
@@ -328,6 +337,7 @@ export default function FixturesPage() {
             home_team_id: home,
             away_team_id: away,
             date: null,
+            kickoff_at: null,
             home_goals: null,
             away_goals: null,
           });
@@ -371,6 +381,7 @@ export default function FixturesPage() {
               home_team_id: home,
               away_team_id: away,
               date: null,
+              kickoff_at: null,
               home_goals: null,
               away_goals: null,
             });
@@ -447,8 +458,11 @@ export default function FixturesPage() {
         <div className="w-full md:w-44 shrink-0">
           <Input
             type="datetime-local"
-            value={match.date ?? ''}
-            onChange={e => onUpdate(match.id, { date: e.target.value })}
+            value={toLocalDateTimeInputValue(match.kickoff_at) || match.date || ''}
+            onChange={e => onUpdate(match.id, {
+              date: e.target.value,
+              kickoff_at: e.target.value ? new Date(e.target.value).toISOString() : null,
+            })}
             className="h-8 text-xs"
             style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
           />
